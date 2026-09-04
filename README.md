@@ -1,5 +1,7 @@
 # CyberSafe 2026
 
+> 🗺️ **[Open the team Battleplan](https://claude.ai/code/artifact/4e1380d0-e875-4f1a-b02f-5d6e9bbeb180)** - the week-by-week plan, onboarding guide, and live progress tracker. Start there, not here, if you're new or just need to know where things stand. It's also linked as this repo's "Website" (top of the GitHub page, right sidebar).
+
 A permissioned reconnaissance/security-assessment tool, built as a 5-tier web scraping
 ladder for the "How Complex Can You Go? (Complexity Tiers)" capstone presentation. The
 full architecture, database design, and 11-week plan live at
