@@ -8,6 +8,8 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "lxml>=5.3",
     "protego>=0.3",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
 ]
 
 [project.optional-dependencies]

@@ -41,3 +41,21 @@ Populates `data/cybersafe.db` with a `businesses` row and a draft (unauthorized)
 `engagements` row per Chamber of Commerce member. This is the literal outreach list -
 nothing in it can be scanned until a real business signs a scope-of-engagement and its
 row is manually moved to `status='authorized'`.
+
+## Week 2: full schema, migrations, and the authorization gate
+
+The database now has the full schema (`docs/architecture/PLAN.md` Section 4) - Week 1's
+`businesses`/`engagements` tables were extended in place via Alembic, no data lost.
+
+```
+cd backend
+python -m alembic upgrade head    # apply any new migrations
+cd ..
+python -m pytest backend/tests/ -v
+```
+
+`backend/app/auth/gate.py` is the literal thing standing between a sourced business and
+a real scan: `assert_engagement_authorized()` checks status/expiry/tier/host and raises
+`ScanNotAuthorized` on any failure - no scraper call happens unless it passes. The scope
+of engagement template businesses sign before that status can ever become `authorized`
+is at `docs/security_writeup/scope_of_engagement_template.md`.

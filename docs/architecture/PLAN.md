@@ -281,7 +281,7 @@ between the Week 1 directory-scrape output and any real scan being possible.
 | Week | Focus | Demoable state |
 |---|---|---|
 | 1 | Repo scaffolding, dependency setup, Ollama sanity check. **Build + run the Chamber of Commerce directory scraper** (Section 2) — DONE, 538 businesses sourced; request NVD API key | Real Python artifact day one: a populated, code-generated outreach list, already gated `draft` |
-| 2 | Finalize scope-of-engagement doc; begin real outreach to sourced businesses; full DB schema + Alembic; `assert_engagement_authorized` gate + unit tests | Prove via test that scans are blocked for every `draft`/`pending_signature` row while outreach is underway |
+| 2 | Finalize scope-of-engagement doc (DONE); begin real outreach to sourced businesses; full DB schema + Alembic (DONE); `assert_engagement_authorized` gate + unit tests (DONE, 8/8 passing) | Prove via test that scans are blocked for every `draft`/`pending_signature` row while outreach is underway - DONE |
 | 3 | Tier 1 fallback fetcher + Tier 2 Playwright crawler (render + CSS extraction) against the team's own sandbox site | Trigger-through-gate scan against an authorized *test* engagement |
 | 4 | First real signed Wilkes County engagement (flag/replan if not yet signed); Tier 3 Scrapy project (`CrawlSpider`, `AUTOTHROTTLE`, `ROBOTSTXT_OBEY`, subprocess-invoked) + asyncio/aiohttp recon-sweep; Tier 4 utilities wired into Tiers 1-3 | Full recursive crawl of an authorized target with visible rate-limit/robots compliance in logs |
 | 5 | Enrichment batch 1: NVD CVE matching, in-house header grading, crt.sh | Scan produces cross-referenced CVE matches + header grade |
