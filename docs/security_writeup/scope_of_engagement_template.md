@@ -6,9 +6,31 @@ fill in every bracketed field before use, and have both sides sign before any sc
 runs against a live target. This is a student capstone project, not a licensed
 professional penetration test; treat it accordingly and keep the scope conservative.*
 
+> **Before you use this with a real business:** get it reviewed by your instructor/
+> program first. This is a real legal document real people will sign - a second set of
+> eyes from someone with authority over the program should happen once, before the
+> first real signature, not after.
+
+## How to fill this out
+
+1. **Maximum tier authorized** (Section 2) - see the attached
+   [tier explainer](tier_explainer_one_pager.md) before choosing. Never write down a
+   tier that isn't actually built yet - check
+   [the Battleplan](https://claude.ai/code/artifact/4e1380d0-e875-4f1a-b02f-5d6e9bbeb180)
+   for current status. When unsure, authorize the lowest tier that's genuinely working.
+2. **Testing window** (Section 4) - two weeks from the signature date is a reasonable
+   default unless there's a specific reason to shorten or extend it.
+3. **Engagement Reference #** (below) - once this business exists in our database as an
+   `engagement` row, put its actual ID here *before* printing/sending the document, so
+   the signed paper and the database row can never be mixed up. Ask whoever's handling
+   the backend if you don't know the ID.
+
 ---
 
 ## 1. Parties
+
+**Engagement Reference #:** [matches the `engagements.id` row in our database - fill
+this in before printing/sending, not after]
 
 **Business:** [Legal business name]
 **Business contact:** [Name, title, phone, email]
@@ -33,8 +55,8 @@ professional penetration test; treat it accordingly and keep the scope conservat
 **In-scope hosts/domains:** [list every domain/subdomain covered — nothing outside
 this list is authorized]
 
-**Maximum tier authorized:** [1-5, per the project's complexity ladder — see attached
-one-page tier explainer]
+**Maximum tier authorized:** [1-5, per the project's complexity ladder — see the
+attached [tier explainer](tier_explainer_one_pager.md)]
 
 ## 3. What we will NOT do (out of scope)
 
