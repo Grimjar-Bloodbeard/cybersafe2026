@@ -276,24 +276,58 @@ between the Week 1 directory-scrape output and any real scan being possible.
 
 ---
 
-## 9. 11-week milestone plan (from 2026-09-04)
+## 9. 11-week plan — reconciled with the program's actual curriculum (2026-09-04)
 
-| Week | Focus | Demoable state |
-|---|---|---|
-| 1 | Repo scaffolding, dependency setup, Ollama sanity check. **Build + run the Chamber of Commerce directory scraper** (Section 2) — DONE, 538 businesses sourced; request NVD API key | Real Python artifact day one: a populated, code-generated outreach list, already gated `draft` |
-| 2 | Finalize scope-of-engagement doc (DONE); begin real outreach to sourced businesses; full DB schema + Alembic (DONE); `assert_engagement_authorized` gate + unit tests (DONE, 8/8 passing) | Prove via test that scans are blocked for every `draft`/`pending_signature` row while outreach is underway - DONE |
-| 3 | Tier 1 fallback fetcher + Tier 2 Playwright crawler (render + CSS extraction) against the team's own sandbox site | Trigger-through-gate scan against an authorized *test* engagement |
-| 4 | First real signed Wilkes County engagement (flag/replan if not yet signed); Tier 3 Scrapy project (`CrawlSpider`, `AUTOTHROTTLE`, `ROBOTSTXT_OBEY`, subprocess-invoked) + asyncio/aiohttp recon-sweep; Tier 4 utilities wired into Tiers 1-3 | Full recursive crawl of an authorized target with visible rate-limit/robots compliance in logs |
-| 5 | Enrichment batch 1: NVD CVE matching, in-house header grading, crt.sh | Scan produces cross-referenced CVE matches + header grade |
-| 6 | Enrichment batch 2: SSL Labs, Shodan InternetDB, anomaly rules; `playwright-stealth` + `proxy_rotator` completed (sandbox-only); instructor check-in | Full pipeline solid pre-Tier-5/UI |
-| 7 | Tier 5: crawl4ai + Ollama build, selector-miss trigger, Pydantic validation, llama3.1->qwen2.5-coder escalation, manual-review fallback | Provable fallback trigger on intentionally messy pages |
-| 8 | Tier 5 synthesis + report generation + human-review gate; Tier 4 "good citizenship stack" write-up; optional non-critical-path Apify stretch if time allows | Report generated end-to-end for a real engagement (not yet delivered) |
-| 9 | Admin UI; Tailscale serve + basic auth + one controlled Funnel test; second engagement scanned end-to-end | Full live-execution UI demoable over tailnet |
-| 10 | Public showcase built/deployed alongside codynoah.net; security write-up assembled; presentation draft | Public site live, write-up drafted |
-| 11 | Full dry-run through Funnel; bug-fix buffer; presentation polish; private report delivery; final submission | Feature-freeze, polish only |
+**Superseded the original version of this section**, which was scheduled against generic
+software-engineering milestones with no connection to what the program actually has
+planned each week. The real curriculum (provided by the program, ~14.5 team-hours/week
+covering *everything* - outreach, OSINT, presentation prep, and tech, not just coding)
+spends only its first two weeks on the scraper itself, then shifts almost entirely to
+outreach, community research, cybersecurity literacy, and presentation/consulting
+skills - with **Week 7 ("Rapid Fire Assessments") as the real hard deadline** for the
+AI pipeline to be live and usable, not an arbitrary sprint boundary. Technical work from
+here on is scheduled to *support* each week's actual curriculum focus, not compete with it.
 
-Legal/scope work is front-loaded (Weeks 1-2, before any real-target scraping), Tier 5 gets a
-full two uninterrupted weeks (7-8), Week 11 is pure dry-run/polish/delivery.
+**Decision (2026-09-04): keep the full AI-driven tier ladder - not scaled back - but
+reframed as the engine that makes a Rapid Fire Assessment actually rapid.** Instead of a
+student manually working through a security questionnaire with a business owner, they
+run the tool live (in person, per the program), get a plain-English report in minutes,
+and spend their actual skill-building time on the part the curriculum teaches - reading
+the report to a non-technical owner, handling questions, making the case. The tech
+should make their in-person delivery look sharp, not be a second, competing project.
+
+| Program Week | Curriculum focus | Tech build target | Status |
+|---|---|---|---|
+| 1 | Welcome, Python foundations, team orientation | Repo scaffolded, Ollama sanity-checked | **Done** |
+| 2 | Python + scraper build → "functional scraper / usable business data" | Chamber of Commerce directory scraper - 536 businesses sourced, 397 in the 3 target towns | **Done** |
+| 3 | OSINT + community mapping, build a flyer, initial lead lists | Full DB schema + Alembic (data preserved) + the authorization gate (8/8 tests) - so real leads land somewhere structured, not a spreadsheet | **Done, ahead of schedule** |
+| 4 | Outreach foundations - elevator pitch, first calls, real outreach begins | `/engagements` CRUD so a real signature can flip a row to `authorized` without hand-editing SQL; scope-of-engagement doc ready to send | Next |
+| 5 | Outreach + presentation building - story structure, event planning | Tier 2 (Playwright, render + extract) + Tier 1 fallback fetcher, tested against a team sandbox while real signatures are still coming in | |
+| 6 | Small business cybersecurity - MFA, phishing, backups, ransomware, translating tech to non-technical people | Tier 3 (Scrapy + asyncio/aiohttp) + enrichment APIs (NVD, header grading, crt.sh, SSL Labs, Shodan InternetDB), **organized around exactly these 4 categories** - not a generic CVE dump. See the mapping below. | |
+| 7 | **Rapid Fire Assessments - mock RFAs** | **Hard deadline**: Tier 5 (Ollama synthesis) + a fast, guided "RFA mode" UI a student can run live with a business owner sitting there, ending in a plain-English report | |
+| 8 | Public speaking + presentation development | Tool stability/bugfix only - no new features competing with practice time | |
+| 9 | Presentation readiness + outreach push | Same - polish based on what breaks during real mock-RFA use | |
+| 10 | Final prep + consulting skills, dress rehearsal | Full dry run of the RFA flow end-to-end; presentation-ready state locked | |
+| 11 | **Community event** - live delivery, real RFAs performed | Tool used live. Nothing new ships this week. | |
+
+**How Week 6's 4 categories map onto what the tool actually checks and reports on** (so
+the report a student hands a business owner speaks the exact language they were just
+taught to translate, not a generic security scan):
+
+- **MFA** - can we tell from public signals whether login pages support/enforce MFA
+  (e.g. presence of an MFA prompt path, known IdP integration)? Framed as "can we tell
+  if an attacker who guessed a password would be stopped."
+- **Phishing exposure** - SPF/DKIM/DMARC DNS record presence (a real, checkable, public
+  signal of whether the business's domain can be spoofed in phishing emails).
+- **Backups/ransomware exposure** - publicly exposed admin panels, default logins, or
+  known-vulnerable software versions that are common ransomware entry points; framed as
+  "what's the front door an attacker would try first."
+- **General hygiene** - HTTPS enforcement, security headers, TLS grade, exposed
+  `.git`/`.env` files - the baseline "how careful is this business's web presence."
+
+Every finding in the eventual report should be traceable to one of these 4 buckets, so
+the report *is* the plain-language translation exercise Week 6 teaches, not a separate
+artifact from it.
 
 ---
 

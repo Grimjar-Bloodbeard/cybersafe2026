@@ -93,13 +93,24 @@ python -m pytest backend/tests/ -v
 
 ## Progress log
 
-- **Week 1** (done): repo scaffolded; Chamber of Commerce sourcing scraper built and
-  run - 536 businesses, 397 in the three target towns, all landing as unauthorized
-  `draft` engagements.
-- **Week 2** (done): full database schema applied via Alembic (data preserved - verified
-  536/536 rows intact after migration); `assert_engagement_authorized()` gate built with
-  8 passing tests; scope-of-engagement template written.
-- **Week 3** (next): Tier 2 (Playwright) and the Tier 1 fallback fetcher, tested against
-  a sandbox target while real outreach is underway.
+This tracks the *program's* actual week numbers (11 weeks total, mostly outreach/OSINT/
+presentation work - only the first 2 weeks are scraper-focused per the curriculum), not a
+generic engineering sprint count. See `docs/architecture/PLAN.md` Section 9 for the full
+reconciliation and why.
 
-Full week-by-week plan: [`docs/architecture/PLAN.md`](docs/architecture/PLAN.md#9-11-week-milestone-plan-from-2026-09-04).
+- **Week 1-2** (done, combined): repo scaffolded; Chamber of Commerce sourcing scraper
+  built and run - 536 businesses, 397 in the three target towns, all landing as
+  unauthorized `draft` engagements. Matches the curriculum's own "functional scraper /
+  usable business data" outcome for these weeks.
+- **Week 3** (done, ahead of schedule): full database schema applied via Alembic (data
+  preserved - verified 536/536 rows intact after migration); `assert_engagement_authorized()`
+  gate built with 8 passing tests; scope-of-engagement template written. The program's real
+  Week 3 focus is OSINT/community mapping - this gives the real leads somewhere structured
+  to land instead of a spreadsheet.
+- **Week 4** (next): `/engagements` CRUD, so a real signature can flip a row to
+  `authorized` without hand-editing SQL - outreach starts for real this week.
+- **Week 7 is the hard deadline**: the full pipeline through Tier 5 (Ollama synthesis) plus
+  a fast, live-usable "RFA mode" UI needs to work by the program's mock Rapid Fire
+  Assessments week - that's what a student actually runs in front of a business owner.
+
+Full plan: [`docs/architecture/PLAN.md`](docs/architecture/PLAN.md#9-11-week-plan--reconciled-with-the-programs-actual-curriculum-2026-09-04).
