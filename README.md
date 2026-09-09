@@ -16,7 +16,7 @@ Picked by each person, not assigned - see [Issue #1](https://github.com/Grimjar-
 | Role | Who | Owns |
 |---|---|---|
 | Lead Scripter / Infrastructure | *TBD* | Core scraping/backend logic, hosting, deployment |
-| OSINT Analyst / Data Modeler | *TBD* | Business research, target profiles, data shape |
+| OSINT Analyst / Data Modeler | Zack | Business research, target profiles, data shape |
 | UI / Presentation Wrangler | *TBD* | The live dashboard + the actual presentation |
 | Outreach & Engagement Lead | *TBD* | The business pipeline - contact through signature |
 
