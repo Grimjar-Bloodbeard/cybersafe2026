@@ -17,7 +17,7 @@ Picked by each person, not assigned - see [Issue #1](https://github.com/Grimjar-
 |---|---|---|
 | Lead Scripter / Infrastructure | *TBD* | Core scraping/backend logic, hosting, deployment |
 | OSINT Analyst / Data Modeler | Zack | Business research, target profiles, data shape |
-| UI / Presentation Wrangler | *TBD* | The live dashboard + the actual presentation |
+| UI / Presentation Wrangler | Andrew | The live dashboard + the actual presentation |
 | Outreach & Engagement Lead | *TBD* | The business pipeline - contact through signature |
 
 ## The idea in one paragraph
