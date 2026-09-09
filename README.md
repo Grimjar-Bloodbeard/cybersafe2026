@@ -9,6 +9,17 @@ full architecture, database design, and 11-week plan live at
 behind every decision below. This README is the map; the module READMEs are the guided
 tours; the plan doc is the reference.
 
+## Team
+
+Picked by each person, not assigned - see [Issue #1](https://github.com/Grimjar-Bloodbeard/cybersafe2026/issues/1) if yours isn't filled in yet.
+
+| Role | Who | Owns |
+|---|---|---|
+| Lead Scripter / Infrastructure | *TBD* | Core scraping/backend logic, hosting, deployment |
+| OSINT Analyst / Data Modeler | *TBD* | Business research, target profiles, data shape |
+| UI / Presentation Wrangler | *TBD* | The live dashboard + the actual presentation |
+| Outreach & Engagement Lead | *TBD* | The business pipeline - contact through signature |
+
 ## The idea in one paragraph
 
 Most security assessment tools are either free-but-shallow (a single automated scanner)
