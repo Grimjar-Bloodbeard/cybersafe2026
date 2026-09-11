@@ -112,7 +112,7 @@ generic engineering sprint count. See `docs/architecture/PLAN.md` Section 9 for 
 reconciliation and why.
 
 - **Week 1-2** (done, combined): repo scaffolded; Chamber of Commerce sourcing scraper
-  built and run - 536 businesses, 397 in the three target towns, all landing as
+  built and run - 536 businesses, 399 in the three target towns (381 with a phone or website on file - genuinely reachable), all landing as
   unauthorized `draft` engagements. Matches the curriculum's own "functional scraper /
   usable business data" outcome for these weeks.
 - **Week 3** (done, ahead of schedule): full database schema applied via Alembic (data
