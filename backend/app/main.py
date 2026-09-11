@@ -17,14 +17,15 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy.orm import Session
 
 from backend.app.db.models import EventRegistration
-from backend.app.db.session import SessionLocal
+from backend.app.db.session import get_session
 from backend.app.rate_limit import PerIPRateLimiter, client_ip
 from scrapers.tier5_ai.synthesis import CATEGORY_LABELS, synthesize_report
 from scripts.demo_tier5_synthesis import SAMPLE_BUSINESS, SAMPLE_FINDINGS
@@ -74,7 +75,11 @@ class RegistrationRequest(BaseModel):
 
 
 @app.post("/api/register")
-def submit_registration(registration: RegistrationRequest, request: Request):
+def submit_registration(
+    registration: RegistrationRequest,
+    request: Request,
+    db: Session = Depends(get_session),
+):
     REGISTER_RATE_LIMIT.check(client_ip(request))
 
     if registration.hp_website:
@@ -82,17 +87,16 @@ def submit_registration(registration: RegistrationRequest, request: Request):
         # to look for a different tell. Never write a row.
         return JSONResponse({"status": "registered"})
 
-    with SessionLocal() as session:
-        session.add(
-            EventRegistration(
-                group_size=registration.group_size,
-                attendee_names=json.dumps(registration.attendee_names),
-                organization=registration.organization,
-                email=registration.email,
-                submitted_at=datetime.now(timezone.utc).isoformat(),
-            )
+    db.add(
+        EventRegistration(
+            group_size=registration.group_size,
+            attendee_names=json.dumps(registration.attendee_names),
+            organization=registration.organization,
+            email=registration.email,
+            submitted_at=datetime.now(timezone.utc).isoformat(),
         )
-        session.commit()
+    )
+    db.commit()
     return JSONResponse({"status": "registered"})
 
 
