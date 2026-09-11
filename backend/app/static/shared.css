@@ -1,0 +1,91 @@
+/* Shared design system across every CyberSafe page - colors, fonts, the
+masthead with the real WCC/CCN logos, and base button styles. Page-specific
+layout stays inline in each template; this is only what genuinely repeats,
+so the two pages can't silently drift out of visual sync with each other. */
+
+:root {
+  --mist: #EEF1EF;
+  --paper: #FBFBF9;
+  --ridge-green: #7A9450;
+  --ridge-blue: #4E86B5;
+  --navy: #1B3A63;
+  --ccn-navy: #1F3F73;
+  --ccn-blue: #4F87C4;
+  --ccn-orange: #EF8B2E;
+  --ink: #16202A;
+  --ink-soft: #4B5A66;
+  --ink-faint: #8B99A3;
+  --rule: #DCE1DE;
+  --sky-clear: #3F7D6B;
+  --sky-clear-soft: #DCEBE5;
+  --sky-hazy: #EF8B2E;
+  --sky-hazy-soft: #FBE8D3;
+  --sky-storm: #A8442E;
+  --sky-storm-soft: #F3DCD5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--mist);
+  color: var(--ink);
+  font-family: "Public Sans", -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.6;
+}
+
+header.masthead {
+  background: var(--paper);
+  border-bottom: 4px solid;
+  border-image: linear-gradient(90deg, var(--ridge-green), var(--ridge-blue), var(--ccn-orange)) 1;
+}
+
+.masthead-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 18px 24px;
+}
+
+.masthead-inner img { height: 46px; width: auto; }
+
+.wordmark {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--navy);
+  text-align: center;
+}
+
+.wordmark span { color: var(--ccn-orange); }
+
+.wordmark small {
+  display: block;
+  font-family: "Public Sans", sans-serif;
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+}
+
+footer { max-width: 720px; margin: 24px auto 0; padding: 0 24px; color: var(--ink-faint); font-size: 0.8rem; text-align: center; }
+footer a { color: var(--ink-faint); }
+
+button.run, button.voice {
+  font-family: "Public Sans", sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: 4px;
+  padding: 14px 26px;
+  cursor: pointer;
+}
+button.run { color: var(--paper); background: var(--navy); }
+button.run:hover { background: var(--ccn-navy); }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+button.voice { color: var(--navy); background: var(--mist); border: 1px solid var(--rule); display: none; }
+button.voice.show { display: inline-block; }
+button:focus-visible { outline: 2px solid var(--ccn-orange); outline-offset: 2px; }

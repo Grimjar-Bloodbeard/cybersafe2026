@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CyberSafe 2026 - Event Registration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/shared.css">
+<style>
+  main { max-width: 640px; margin: 40px auto 0; padding: 0 24px 80px; }
+
+  .card {
+    background: var(--paper);
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(27, 39, 51, 0.08);
+    padding: 40px;
+  }
+
+  .card h1 { font-family: "Fraunces", Georgia, serif; font-size: 1.6rem; font-weight: 500; margin: 0 0 8px; }
+  .card .event-details { color: var(--ink-soft); font-size: 0.92rem; margin: 0 0 28px; line-height: 1.7; }
+  .card .event-details b { color: var(--ink); }
+
+  .field { margin-bottom: 20px; }
+  .field label { display: block; font-weight: 600; font-size: 0.92rem; margin-bottom: 6px; }
+  .field .hint { font-weight: 400; color: var(--ink-faint); font-size: 0.82rem; }
+
+  input[type="number"], input[type="text"], input[type="email"] {
+    width: 100%;
+    font-family: "Public Sans", sans-serif;
+    font-size: 0.95rem;
+    padding: 11px 14px;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--mist);
+    color: var(--ink);
+  }
+  input:focus-visible { outline: 2px solid var(--ccn-orange); outline-offset: 1px; }
+
+  #attendee-fields { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+
+  .error-text { color: var(--sky-storm); font-size: 0.85rem; margin-top: 6px; display: none; }
+  .error-text.show { display: block; }
+
+  button.run { width: 100%; margin-top: 8px; }
+
+  .success-state { display: none; text-align: center; padding: 20px 0; }
+  .success-state.show { display: block; }
+  .success-state h1 { font-family: "Fraunces", Georgia, serif; font-size: 1.5rem; font-weight: 500; margin: 0 0 10px; }
+  .success-state p { color: var(--ink-soft); }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <img src="/static/wcc-logo.png" alt="Wilkes Community College">
+    <div class="wordmark">Cyber<span>Safe</span><small>a Carolina Cyber Network project</small></div>
+    <img src="/static/ccn-logo.png" alt="Carolina Cyber Network">
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <div id="form-view">
+      <h1>Register for the community event</h1>
+      <p class="event-details">
+        <b>When:</b> December 11, 2026<br>
+        <b>Where:</b> Wilkes Community College <i>(room TBD)</i><br>
+        <b>Questions:</b> <i>contact email TBD</i>
+      </p>
+
+      <form id="register-form">
+        <div class="field">
+          <label for="group-size">How many people in your group?</label>
+          <input type="number" id="group-size" min="1" max="10" value="1" required>
+        </div>
+
+        <div class="field">
+          <label>Attendee names <span class="hint">(one per person attending)</span></label>
+          <div id="attendee-fields"></div>
+        </div>
+
+        <div class="field">
+          <label for="organization">Organization or business (write "N/A" if none)</label>
+          <input type="text" id="organization" required>
+        </div>
+
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" required>
+        </div>
+
+        <p class="error-text" id="error-text"></p>
+
+        <button class="run" type="submit">Register</button>
+      </form>
+    </div>
+
+    <div class="success-state" id="success-view">
+      <h1>You're registered</h1>
+      <p>We'll see you December 11 at Wilkes Community College. A confirmation has been recorded - no email will be sent yet, this is a working demo.</p>
+    </div>
+  </div>
+</main>
+
+<footer>CyberSafe 2026 &middot; Wilkes Community College &middot; Carolina Cyber Network &middot; <a href="/">See the demo assessment</a></footer>
+
+<script>
+function $(id) { return document.getElementById(id); }
+
+function renderAttendeeFields(count) {
+  const container = $("attendee-fields");
+  const existing = container.querySelectorAll("input");
+  const existingValues = Array.from(existing).map(i => i.value);
+  container.innerHTML = "";
+  for (let i = 0; i < count; i++) {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = `Attendee ${i + 1} name`;
+    input.required = true;
+    input.value = existingValues[i] || "";
+    container.appendChild(input);
+  }
+}
+
+renderAttendeeFields(1);
+
+$("group-size").addEventListener("input", (e) => {
+  const count = Math.min(Math.max(parseInt(e.target.value, 10) || 1, 1), 10);
+  renderAttendeeFields(count);
+});
+
+$("register-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const errorEl = $("error-text");
+  errorEl.classList.remove("show");
+
+  const attendeeNames = Array.from($("attendee-fields").querySelectorAll("input")).map(i => i.value.trim());
+  const submitButton = e.target.querySelector("button");
+  submitButton.disabled = true;
+
+  try {
+    const resp = await fetch("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        group_size: parseInt($("group-size").value, 10),
+        attendee_names: attendeeNames,
+        organization: $("organization").value.trim(),
+        email: $("email").value.trim(),
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail ? JSON.stringify(data.detail) : "Registration failed");
+
+    $("form-view").style.display = "none";
+    $("success-view").classList.add("show");
+  } catch (err) {
+    errorEl.textContent = "Something went wrong submitting this - double check the fields and try again.";
+    errorEl.classList.add("show");
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+</script>
+
+</body>
+</html>

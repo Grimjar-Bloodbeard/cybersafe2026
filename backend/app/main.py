@@ -10,13 +10,18 @@ that's a separate, deliberate deployment step, not done here.
 """
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from pydantic import BaseModel, EmailStr, Field
 
+from backend.app.db.models import EventRegistration
+from backend.app.db.session import SessionLocal
 from scrapers.tier5_ai.synthesis import CATEGORY_LABELS, synthesize_report
 from scripts.demo_tier5_synthesis import SAMPLE_BUSINESS, SAMPLE_FINDINGS
 
@@ -32,6 +37,7 @@ _env = Environment(
     autoescape=select_autoescape(["html"]),
 )
 _page = _env.get_template("report.html").render()
+_register_page = _env.get_template("register.html").render()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -39,6 +45,34 @@ def show_report():
     # The page is fully static HTML - it fetches and reveals the report itself
     # via /api/run-demo, so there's nothing server-side left to fill in here.
     return _page
+
+
+@app.get("/register", response_class=HTMLResponse)
+def show_register():
+    return _register_page
+
+
+class RegistrationRequest(BaseModel):
+    group_size: int = Field(gt=0, le=50)
+    attendee_names: list[str] = Field(min_length=1)
+    organization: str = Field(min_length=1, max_length=200)
+    email: EmailStr
+
+
+@app.post("/api/register")
+def submit_registration(registration: RegistrationRequest):
+    with SessionLocal() as session:
+        session.add(
+            EventRegistration(
+                group_size=registration.group_size,
+                attendee_names=json.dumps(registration.attendee_names),
+                organization=registration.organization,
+                email=registration.email,
+                submitted_at=datetime.now(timezone.utc).isoformat(),
+            )
+        )
+        session.commit()
+    return JSONResponse({"status": "registered"})
 
 
 @app.post("/api/run-demo")

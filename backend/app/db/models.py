@@ -218,3 +218,19 @@ class DemoShowcaseRun(Base):
     tier_demonstrated: Mapped[int] = mapped_column(Integer, nullable=False)
     synthetic_or_redacted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     summary_text: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class EventRegistration(Base):
+    """Community event RSVPs (the Dec 11, 2026 event) - a separate concern from
+    the assessment pipeline above, kept in its own table rather than entangled
+    with businesses/engagements.
+    """
+
+    __tablename__ = "event_registrations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    group_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    attendee_names: Mapped[str] = mapped_column(Text, nullable=False)  # JSON-encoded list
+    organization: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[str] = mapped_column(String, nullable=False)
+    submitted_at: Mapped[str] = mapped_column(String, nullable=False)
