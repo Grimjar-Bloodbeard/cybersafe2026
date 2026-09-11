@@ -20,6 +20,18 @@ from scrapers.tier5_ai.schemas import SynthesizedReport
 DEFAULT_MODEL = "llama3.1:8b"
 ESCALATION_MODEL = "qwen2.5-coder:14b"
 
+# The single source of truth for category display names - both render_markdown()
+# below and the front end (backend/app/main.py exposes this same dict via the
+# API response, report.html reads it from there) use this, so the two views
+# can't silently drift the way they would with two independently hand-written
+# copies.
+CATEGORY_LABELS = {
+    "mfa": "Login security",
+    "phishing_exposure": "Phishing exposure",
+    "backups_ransomware": "Backup & ransomware risk",
+    "general_hygiene": "General hygiene",
+}
+
 log = logging.getLogger("tier5_synthesis")
 
 SYSTEM_PROMPT = """You are writing a security assessment report for a small business \
@@ -87,13 +99,7 @@ def render_markdown(business_name: str, report: SynthesizedReport) -> str:
         "",
         "## What we found",
     ]
-    category_labels = {
-        "mfa": "Login security (MFA)",
-        "phishing_exposure": "Phishing / email spoofing exposure",
-        "backups_ransomware": "Backup & ransomware entry points",
-        "general_hygiene": "General website hygiene",
-    }
-    for category, label in category_labels.items():
+    for category, label in CATEGORY_LABELS.items():
         matching = [f for f in report.findings if f.category == category]
         if not matching:
             continue

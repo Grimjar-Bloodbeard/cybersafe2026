@@ -175,6 +175,7 @@
   }
   button.run { color: var(--paper); background: var(--navy); }
   button.run:hover { background: var(--ccn-navy); }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
   button.voice { color: var(--navy); background: var(--mist); border: 1px solid var(--rule); display: none; }
   button.voice.show { display: inline-block; }
   button:focus-visible { outline: 2px solid var(--ccn-orange); outline-offset: 2px; }
@@ -239,17 +240,21 @@
 <footer>CyberSafe 2026 &middot; Wilkes Community College &middot; Carolina Cyber Network</footer>
 
 <script>
-const CATEGORY_LABELS = {
-  mfa: "Login security",
-  phishing_exposure: "Phishing exposure",
-  backups_ransomware: "Backup & ransomware risk",
-  general_hygiene: "General hygiene",
-};
-
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 let lastSummary = "";
+let isRunning = false;
 
 function $(id) { return document.getElementById(id); }
+
+// Builds a DOM element from plain text via .textContent, never innerHTML, so
+// AI-generated finding text can never be interpreted as HTML/script - it's
+// always displayed exactly as inert text, no matter what it contains.
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
 
 async function typeText(el, text, speed = 18) {
   el.textContent = "";
@@ -264,30 +269,46 @@ async function typeText(el, text, speed = 18) {
   cursor.remove();
 }
 
-function revealFindings(findings) {
+function revealFindings(findings, categoryLabels) {
   const container = $("findings-container");
   container.innerHTML = "";
-  const order = ["mfa", "phishing_exposure", "backups_ransomware", "general_hygiene"];
   let delay = 0;
-  order.forEach(catKey => {
+  Object.keys(categoryLabels).forEach(catKey => {
     const items = findings.filter(f => f.category === catKey);
     if (!items.length) return;
-    const catEl = document.createElement("div");
-    catEl.className = "category";
-    catEl.innerHTML = `<h2>${CATEGORY_LABELS[catKey]}</h2>`;
+
+    const catEl = el("div", "category");
+    catEl.appendChild(el("h2", null, categoryLabels[catKey]));
+
     items.forEach(f => {
-      const row = document.createElement("div");
-      row.className = `finding ${f.severity}`;
-      row.innerHTML = `<div class="dot"></div><div class="body"><div class="title">${f.title}</div><div class="explanation">${f.plain_english_explanation}</div></div>`;
+      const row = el("div", `finding ${f.severity}`);
+      row.appendChild(el("div", "dot"));
+      const body = el("div", "body");
+      body.appendChild(el("div", "title", f.title));
+      body.appendChild(el("div", "explanation", f.plain_english_explanation));
+      row.appendChild(body);
       catEl.appendChild(row);
     });
+
     container.appendChild(catEl);
     setTimeout(() => catEl.classList.add("show"), delay);
     delay += reduceMotion ? 0 : 220;
   });
 }
 
+function showError(message) {
+  $("loading-state").classList.remove("active");
+  $("empty-state").style.display = "block";
+  $("empty-state").querySelector("h1").textContent = "Something went wrong";
+  $("empty-state").querySelector("p").textContent = message;
+}
+
 async function runAssessment() {
+  if (isRunning) return;  // ignore double-clicks/rapid re-runs while one is in flight
+  isRunning = true;
+  $("run-btn").disabled = true;
+  $("run-again-btn").disabled = true;
+
   $("empty-state").style.display = "none";
   $("loading-state").classList.add("active");
   $("report-card").classList.remove("active");
@@ -295,29 +316,38 @@ async function runAssessment() {
   $("voice-btn").classList.remove("show");
   $("run-again-btn").style.display = "none";
 
-  const resp = await fetch("/api/run-demo", { method: "POST" });
-  const data = await resp.json();
+  try {
+    const resp = await fetch("/api/run-demo", { method: "POST" });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || `Request failed (${resp.status})`);
 
-  $("loading-state").classList.remove("active");
-  $("report-card").classList.add("active");
+    $("loading-state").classList.remove("active");
+    $("report-card").classList.add("active");
 
-  $("report-business-name").textContent = data.business_name;
+    $("report-business-name").textContent = data.business_name;
 
-  const outlook = $("outlook");
-  outlook.className = `outlook ${data.risk_rating.toLowerCase()}`;
-  $("rating-text").textContent = data.risk_rating;
-  requestAnimationFrame(() => outlook.classList.add("show"));
+    const outlook = $("outlook");
+    outlook.className = `outlook ${data.risk_rating.toLowerCase()}`;
+    $("rating-text").textContent = data.risk_rating;
+    requestAnimationFrame(() => outlook.classList.add("show"));
 
-  lastSummary = data.executive_summary;
-  await typeText($("summary-text"), data.executive_summary);
+    lastSummary = data.executive_summary;
+    await typeText($("summary-text"), data.executive_summary);
 
-  revealFindings(data.findings);
+    revealFindings(data.findings, data.category_labels);
 
-  $("not-tested-text").textContent = data.what_we_did_not_test;
-  setTimeout(() => $("not-tested").classList.add("show"), 200);
+    $("not-tested-text").textContent = data.what_we_did_not_test;
+    setTimeout(() => $("not-tested").classList.add("show"), 200);
 
-  $("voice-btn").classList.add("show");
-  $("run-again-btn").style.display = "inline-block";
+    $("voice-btn").classList.add("show");
+    $("run-again-btn").style.display = "inline-block";
+  } catch (err) {
+    showError(`The assessment couldn't be generated (${err.message}). Check that Ollama is running, then try again.`);
+  } finally {
+    isRunning = false;
+    $("run-btn").disabled = false;
+    $("run-again-btn").disabled = false;
+  }
 }
 
 $("run-btn").addEventListener("click", runAssessment);
