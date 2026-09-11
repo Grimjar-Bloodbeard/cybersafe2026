@@ -6,6 +6,8 @@ venv/
 .env
 *.db
 *.db-journal
+data/*.csv
+data/*.xlsx
 .pytest_cache/
 node_modules/
 dist/
