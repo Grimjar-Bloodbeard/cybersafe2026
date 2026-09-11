@@ -82,7 +82,15 @@ python -m scrapers.tier1_static.directory_scraper              # full run, ~538 
 # Week 2 - apply the database schema and run the test suite
 cd backend && python -m alembic upgrade head && cd ..
 python -m pytest backend/tests/ -v
+
+# Demo front end (Tier 5, real WCC/CCN branding) - open http://127.0.0.1:8000/ after
+python -m uvicorn backend.app.main:app --reload
 ```
+
+"Run demo assessment" calls the real Ollama synthesis pipeline against synthetic sample
+findings (no real business involved) and reveals the report live - typewriter text, a
+weather-metaphor risk badge, and a "Read summary aloud" voice button. If generation
+feels slow, that's a known issue - see `scrapers/README.md`'s Tier 5 section.
 
 ## A few terms, for anyone newer to this stack
 
