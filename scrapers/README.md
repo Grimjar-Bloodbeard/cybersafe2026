@@ -15,7 +15,7 @@ progressively more capable (and more expensive) tool:
 | 2 (`tier2_playwright/`, coming Week 3) | Does the page need JavaScript to render its real content? | `Playwright` (drives a real browser) |
 | 3 (`tier3_scrapy/`, `tier3_asyncio/`, coming Week 4) | I need many pages, fast - how do I not do this one at a time? | `Scrapy`, `asyncio`/`aiohttp` |
 | 4 (`common/`, wraps every tier) | How do I behave like a careful, identifiable visitor instead of a flood? | rate limiting, robots.txt compliance, realistic fingerprints |
-| 5 (`tier5_ai/`, coming Week 7) | The page's structure is too inconsistent for fixed selectors - now what? | a local LLM reads it like a person would |
+| 5 (`tier5_ai/`, started ahead of schedule) | The page's structure is too inconsistent for fixed selectors, or raw findings need translating into plain English - now what? | a local LLM (Ollama) reads it like a person would |
 
 **Tier 4 is not a separate step you reach later.** `common/rate_limiter.py` and
 `common/robots_check.py` are already used by the Tier 1 scraper - every tier we build
@@ -105,6 +105,31 @@ exactly what it is and how to reach us. A scraper that fakes a browser's User-Ag
 blend in is doing something different - and for Tier 4 (Week 4-6), we'll draw that line
 explicitly: realistic fingerprinting gets *demonstrated* against a sandbox we control,
 never used to disguise traffic against a real, permissioned engagement target.
+
+## `tier5_ai/` - translating findings into plain English
+
+This is the piece that turns technical findings into the actual report a student hands
+a business owner. It doesn't scrape anything itself - it takes findings (from any
+tier) and asks a local AI model (via [Ollama](https://ollama.com), already running on
+the team's dev machine, nothing sent to the cloud) to write them up.
+
+- **`schemas.py`** defines the exact shape of a report (a `Pydantic` model - a Python
+  class that validates its own data). This gets passed to Ollama as a JSON schema via
+  the `format` parameter, which forces the model's response to be valid JSON matching
+  that shape - it can't wander off into a paragraph of prose when we need structured
+  fields to store in the database.
+- **`synthesis.py`** builds the prompt, calls Ollama, and validates the response against
+  the schema. If `llama3.1:8b` (the default) produces something that doesn't validate,
+  it escalates once to `qwen2.5-coder:14b` before giving up loudly (`RuntimeError`) -
+  fail-closed again, same principle as the authorization gate: never hand over a
+  guessed or malformed report.
+- **`render_markdown()`** turns the validated, structured report into the actual
+  Markdown document - organized by the same 4 categories (MFA, phishing exposure,
+  backups/ransomware, general hygiene) the team is learning about in Week 6.
+
+Try it: `python -m scripts.demo_tier5_synthesis` runs the whole pipeline against
+clearly synthetic sample findings (no real business involved - nothing's been
+authorized yet) and writes the result to `data/sample_report.md`.
 
 ## Running it
 
