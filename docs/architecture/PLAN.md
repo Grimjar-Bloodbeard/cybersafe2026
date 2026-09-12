@@ -242,6 +242,14 @@ solvers/residential proxies against real targets.
 page, 2-3 anonymized example runs, sample report layout, contact form that only emails the
 team (never touches the pipeline).
 
+**Status, 2026-09-12**: the demo report + registration pages (not yet the real scan-triggering
+tool described below) are live at `cybersafe.codynoah.net` — see
+`docs/architecture/DEPLOYMENT.md` for the full runbook. That's safe to be public precisely
+because it can't trigger a real scan against a real business. **The Tailscale-gating
+requirement below still applies in full** the day the real admin/live-execution tool
+(Tiers 2-5 against authorized engagements) actually gets built — don't skip it then just
+because the demo page didn't need it.
+
 **Admin/live-execution** (`frontend_admin`) — talks only to `backend/`, runs at a Tailscale
 MagicDNS name, **tailnet-only by default** (`tailscale serve`), basic auth in front even
 within the tailnet. During an actual presentation, enable `tailscale funnel` on that one port
