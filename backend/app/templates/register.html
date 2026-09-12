@@ -106,7 +106,7 @@
 
     <div class="success-state" id="success-view">
       <h1>You're registered</h1>
-      <p>We'll see you December 11 at Wilkes Community College. A confirmation has been recorded - no email will be sent yet, this is a working demo.</p>
+      <p>We'll see you December 11 at Wilkes Community College. We don't send confirmation emails yet, so keep this page (or a screenshot of it) as your confirmation.</p>
     </div>
   </div>
 </main>
@@ -124,6 +124,9 @@ function renderAttendeeFields(count) {
   for (let i = 0; i < count; i++) {
     const input = document.createElement("input");
     input.type = "text";
+    // A real, accessible label, not just a placeholder - placeholders vanish
+    // once someone types and aren't reliably announced by screen readers.
+    input.setAttribute("aria-label", `Attendee ${i + 1} name`);
     input.placeholder = `Attendee ${i + 1} name`;
     input.required = true;
     input.value = existingValues[i] || "";
