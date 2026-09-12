@@ -62,6 +62,7 @@ comment in the code - it's an actual `pytest` suite proving it (see `backend/REA
 | `scrapers/` | The actual scraping code, one folder per tier, plus the shared "good citizenship" utilities every tier uses | [`scrapers/README.md`](scrapers/README.md) |
 | `backend/` | The database schema, migrations, and the authorization gate | [`backend/README.md`](backend/README.md) |
 | `docs/architecture/PLAN.md` | The full approved plan - stack choices, schema, API list, week-by-week milestones | read this for *why*, not just *what* |
+| `docs/architecture/DEPLOYMENT.md` | The real runbook for hosting the app at cybersafe.codynoah.net, including the actual gotchas hit (permissions, edge caching, propagation) | read this before touching production again |
 | `docs/security_writeup/` | The scope-of-engagement template businesses sign, the tier explainer, and (coming) the ethics/legal write-up | [`docs/security_writeup/README.md`](docs/security_writeup/README.md) - **start here for outreach paperwork** |
 | `data/cybersafe.db` | The shared SQLite database - gitignored, lives only on the machine that ran the scrapers | |
 

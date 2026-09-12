@@ -71,6 +71,13 @@
       </p>
 
       <form id="register-form">
+        <!-- Honeypot: invisible to a real visitor, but a bot's autofill often
+             fills every input it can find. A hidden field a real person never
+             sees or reaches by tabbing to it. Checked server-side in
+             backend/app/main.py - never trust a client-side-only honeypot. -->
+        <input type="text" name="hp_website" id="hp-website" tabindex="-1" autocomplete="off"
+               style="position:absolute; left:-9999px;" aria-hidden="true">
+
         <div class="field">
           <label for="group-size">How many people in your group?</label>
           <input type="number" id="group-size" min="1" max="10" value="1" required>
@@ -99,7 +106,7 @@
 
     <div class="success-state" id="success-view">
       <h1>You're registered</h1>
-      <p>We'll see you December 11 at Wilkes Community College. A confirmation has been recorded - no email will be sent yet, this is a working demo.</p>
+      <p>We'll see you December 11 at Wilkes Community College. We don't send confirmation emails yet, so keep this page (or a screenshot of it) as your confirmation.</p>
     </div>
   </div>
 </main>
@@ -117,6 +124,9 @@ function renderAttendeeFields(count) {
   for (let i = 0; i < count; i++) {
     const input = document.createElement("input");
     input.type = "text";
+    // A real, accessible label, not just a placeholder - placeholders vanish
+    // once someone types and aren't reliably announced by screen readers.
+    input.setAttribute("aria-label", `Attendee ${i + 1} name`);
     input.placeholder = `Attendee ${i + 1} name`;
     input.required = true;
     input.value = existingValues[i] || "";
@@ -148,6 +158,7 @@ $("register-form").addEventListener("submit", async (e) => {
         group_size: parseInt($("group-size").value, 10),
         attendee_names: attendeeNames,
         organization: $("organization").value.trim(),
+        hp_website: $("hp-website").value,
         email: $("email").value.trim(),
       }),
     });
