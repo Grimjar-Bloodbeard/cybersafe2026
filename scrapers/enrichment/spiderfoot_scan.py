@@ -7,10 +7,10 @@ is a real, established OSINT tool someone else wrote (200+ modules, MIT
 license, vendored at vendor/spiderfoot/, not committed to this repo - see
 vendor/spiderfoot/README.md in this file's own folder for the one-time
 setup). Our own authored work here is: curating which of its findings
-actually matter for this project's 4 report categories, and mapping its
-event taxonomy onto them - the same "translate raw technical output into
-something a business owner can read" job every other source in this
-pipeline does.
+actually matter for this project's 4 report categories, and writing an
+accurate, specific explanation for each one - the same "translate raw
+technical output into something a business owner can read" job every other
+source in this pipeline does.
 
 Not wired into the authorization gate yet, because the real scan-triggering
 admin tool (docs/architecture/PLAN.md Section 7) doesn't exist yet either.
@@ -18,6 +18,20 @@ When it does: call backend.app.auth.gate.assert_engagement_authorized()
 BEFORE run_passive_scan(), exactly like every other tier - never after,
 never skipped. Until then, this only ever runs against domains Cody owns
 outright (see scripts/demo_spiderfoot_synthesis.py).
+
+IMPORTANT lesson baked into this file's design (found twice, empirically,
+against real domains - see docs/architecture/PLAN.md Section 5): handing the
+model a bare "{event type}: {raw data}" string is not enough context for it
+to explain a finding accurately. Both times, it filled the gap with a
+confident, wrong, invented explanation instead of an accurate one - that's
+exactly the "don't exaggerate beyond what the finding supports" failure the
+report's own system prompt exists to prevent, and it slipped through because
+the *input* was ambiguous, not because the model malfunctioned. The fix
+isn't a prompt tweak - it's writing a real, specific, human-authored
+explanation for each finding type, the same way SAMPLE_FINDINGS in
+scripts/demo_tier5_synthesis.py already does. EXPLANATION_TEMPLATES below is
+that authored explanation, one per event type - never let a raw SpiderFoot
+string reach the model unexplained.
 """
 from __future__ import annotations
 
@@ -29,59 +43,162 @@ VENDOR_ROOT = Path(__file__).resolve().parents[2] / "vendor" / "spiderfoot"
 SF_PYTHON = VENDOR_ROOT / ".venv" / "Scripts" / "python.exe"
 SF_ENTRYPOINT = VENDOR_ROOT / "sf.py"
 
-DETAIL_MAX_LENGTH = 500
+DETAIL_MAX_LENGTH = 600
 
-# SpiderFoot's human-readable event descriptions -> our 4 report categories
-# (docs/architecture/PLAN.md Section 9). Anything not listed here is real
-# data SpiderFoot found that we don't have a category for yet - it's real
-# information, just not reported on until this mapping grows.
+# SpiderFoot's human-readable event descriptions -> (our category, an
+# accurate explanation template with {data} for SpiderFoot's own payload).
+# Only event types we're confident we can explain correctly belong here -
+# see the two exclusions below for what didn't make the cut and why.
 #
-# Known gap worth stating outright: SpiderFoot's core modules check SPF but
-# have no dedicated DMARC/DKIM check, so our own DNS enrichment still needs
-# to cover those directly (PLAN.md Section 5) - this isn't fully redundant
-# with what SpiderFoot gives us.
-EVENT_CATEGORY_MAP: dict[str, str] = {
+# Deliberately NOT mapped, and why:
+#
+# - "DNS SPF Record" / "Email Gateway (DNS MX Records)": SpiderFoot only
+#   emits these when the record EXISTS - having one is normal, not a
+#   finding (the real risk is an ABSENT record, which needs its own check,
+#   since SpiderFoot has no "missing" event). Tested directly against
+#   codynoah.net: mapping mere presence into phishing_exposure produced a
+#   fabricated claim ("eforward is known to be used by spammers") with
+#   nothing in the finding to support it.
+#
+# - "Malicious Internet Name" / "Blacklisted Internet Name" (from
+#   sfp_comodo specifically): this module's logic is "resolves normally via
+#   real DNS, but Comodo's own DNS servers fail to resolve it" - which is
+#   just as likely to mean DNS propagation lag for a brand-new domain (the
+#   case here: cybersafe.codynoah.net is about a week old) as an actual
+#   threat-intel categorization. Tested directly against
+#   cybersafe.codynoah.net: the model, given only "Malicious Internet Name:
+#   Comodo Secure DNS [host]", invented a backwards explanation ("it's being
+#   used maliciously... configured to use a DNS service that could be used
+#   for malicious purposes") that doesn't match what the module even checks.
+#   A single narrow vendor's DNS-resolution quirk isn't strong enough
+#   evidence to report as a finding to a small business owner.
+#
+# - "Disposable Email Address" and raw "HTTP Headers": not yet triggered by
+#   either real test scan, and HTTP_HEADERS in particular is a raw-data-dump
+#   event type in SpiderFoot's own taxonomy (could be an entire header
+#   block) - not including either until a real occurrence lets us verify
+#   what a correct explanation actually looks like, per the two lessons
+#   above.
+#
+# - SPF/DMARC absence still needs its own dedicated check - not something
+#   SpiderFoot's core modules give us (see PLAN.md Section 5).
+EXPLANATION_TEMPLATES: dict[str, tuple[str, str]] = {
     # MFA / login security - no dedicated passive MFA signal exists; a
-    # discovered login form is the closest thing, framed honestly in the
-    # detail text below (see tier_explainer_one_pager.md's own phrasing).
-    "URL (Accepts Passwords)": "mfa",
-    # Phishing exposure - can this domain be spoofed in a phishing email?
-    # Deliberately NOT mapped: "DNS SPF Record" and "Email Gateway (DNS MX
-    # Records)". SpiderFoot only emits these when the record EXISTS - having
-    # one is normal and not itself a finding (it's the ABSENCE of SPF that's
-    # the real risk signal, which needs its own dedicated check, since
-    # SpiderFoot has no "record missing" event to report). Mapping mere
-    # presence into a risk category was tested directly against
-    # codynoah.net and reliably produced a fabricated claim ("eforward is
-    # known to be used by spammers") with nothing in the actual finding to
-    # support it - the model filled the gap left by a neutral fact forced
-    # into a risk-framed category. Left unmapped on purpose, not an oversight.
-    "Hacked Email Address": "phishing_exposure",
-    "Disposable Email Address": "phishing_exposure",
-    "Malicious E-mail Address": "phishing_exposure",
+    # discovered login form is the closest thing, framed as honestly as the
+    # tier_explainer_one_pager.md's own phrasing: we can tell a login exists,
+    # not whether it's protected.
+    "URL (Accepts Passwords)": (
+        "mfa",
+        "A login page was found at {data}. From outside, there's no way to tell whether "
+        "it requires anything beyond a password to sign in (like a text-message code) - "
+        "that's worth asking about directly, since a stolen password alone shouldn't be "
+        "enough to get in.",
+    ),
+    # Phishing exposure
+    "Hacked Email Address": (
+        "phishing_exposure",
+        "The email address {data}, tied to this domain, has previously appeared in a "
+        "known data breach. If that same password was ever reused anywhere else, an "
+        "attacker may already have a working way in.",
+    ),
+    "Malicious E-mail Address": (
+        "phishing_exposure",
+        "An email address tied to this domain ({data}) has been flagged elsewhere as "
+        "connected to malicious activity. Worth checking whether that address is still "
+        "in active use and by whom.",
+    ),
     # Backups / ransomware exposure - known entry points and existing trouble
-    "Vulnerability - CVE Critical": "backups_ransomware",
-    "Vulnerability - CVE High": "backups_ransomware",
-    "Vulnerability - CVE Medium": "backups_ransomware",
-    "Vulnerability - CVE Low": "backups_ransomware",
-    "Vulnerability - General": "backups_ransomware",
-    "Vulnerability - Third Party Disclosure": "backups_ransomware",
-    "Interesting File": "backups_ransomware",
-    "Historic Interesting File": "backups_ransomware",
-    "Defaced": "backups_ransomware",
-    "Defaced IP Address": "backups_ransomware",
-    "Open TCP Port": "backups_ransomware",
-    "Software Used": "backups_ransomware",
-    "Malicious IP Address": "backups_ransomware",
-    "Malicious Internet Name": "backups_ransomware",
-    # General hygiene - baseline web/TLS/header care
-    "SSL Certificate Expired": "general_hygiene",
-    "SSL Certificate Expiring": "general_hygiene",
-    "SSL Certificate Host Mismatch": "general_hygiene",
-    "HTTP Headers": "general_hygiene",
-    "Non-Standard HTTP Header": "general_hygiene",
-    "Web Technology": "general_hygiene",
-    "Web Server": "general_hygiene",
+    "Vulnerability - CVE Critical": (
+        "backups_ransomware",
+        "A specific, publicly documented security flaw was found in software this site "
+        "runs: {data}. This isn't a guess - it's a known, catalogued weakness, and "
+        "critical-rated ones are exactly the kind ransomware attacks use to get in.",
+    ),
+    "Vulnerability - CVE High": (
+        "backups_ransomware",
+        "A specific, publicly documented security flaw was found in software this site "
+        "runs: {data}. This is a known, catalogued weakness, not a guess.",
+    ),
+    "Vulnerability - CVE Medium": (
+        "backups_ransomware",
+        "A specific, publicly documented security flaw was found in software this site "
+        "runs: {data}. Lower severity than critical, but still worth patching.",
+    ),
+    "Vulnerability - CVE Low": (
+        "backups_ransomware",
+        "A specific, publicly documented security flaw was found in software this site "
+        "runs: {data}. Low severity, but still worth knowing about.",
+    ),
+    "Vulnerability - General": (
+        "backups_ransomware",
+        "A general security weakness was identified: {data}.",
+    ),
+    "Vulnerability - Third Party Disclosure": (
+        "backups_ransomware",
+        "A security researcher or third party has already published a report describing "
+        "a vulnerability tied to this site: {data}. If it's public, an attacker can find "
+        "it just as easily as we did.",
+    ),
+    "Interesting File": (
+        "backups_ransomware",
+        "A file was found publicly reachable that usually shouldn't be: {data}. "
+        "Depending on what it actually contains, this can hand an attacker a shortcut "
+        "past normal defenses - worth confirming it's meant to be public.",
+    ),
+    "Historic Interesting File": (
+        "backups_ransomware",
+        "A file that usually shouldn't be publicly reachable was found here in the past: "
+        "{data}. Worth confirming it's no longer exposed today.",
+    ),
+    "Defaced": (
+        "backups_ransomware",
+        "A record exists suggesting this site has been defaced (visibly altered by an "
+        "attacker) at some point: {data}. Worth confirming this isn't still true today.",
+    ),
+    "Open TCP Port": (
+        "backups_ransomware",
+        "A network port is open and reachable from the internet: {data}. Not automatically "
+        "a problem, but every open port is one more thing that has to be kept patched and "
+        "watched.",
+    ),
+    "Software Used": (
+        "backups_ransomware",
+        "This site is running: {data}. If a security flaw is ever reported for this "
+        "specific version, it becomes an easy, publicly-known target until it's updated - "
+        "keeping software current is the main defense here.",
+    ),
+    # General hygiene - baseline web/TLS care
+    "SSL Certificate Expired": (
+        "general_hygiene",
+        "This site's SSL/TLS certificate (what puts the padlock icon in a browser) has "
+        "expired: {data}. Visitors will see a scary security warning until it's renewed.",
+    ),
+    "SSL Certificate Expiring": (
+        "general_hygiene",
+        "This site's SSL/TLS certificate is close to expiring: {data}. Best to renew it "
+        "before it lapses and visitors start seeing warnings.",
+    ),
+    "SSL Certificate Host Mismatch": (
+        "general_hygiene",
+        "This site's SSL/TLS certificate doesn't match the address it's serving: {data}. "
+        "That mismatch can trigger browser security warnings for visitors even though "
+        "nothing was actually compromised.",
+    ),
+    "Non-Standard HTTP Header": (
+        "general_hygiene",
+        "This site sends an unusual, non-standard web server header: {data}. Not "
+        "dangerous by itself, but it can reveal more about the server's setup than "
+        "necessary.",
+    ),
+    "Web Technology": (
+        "general_hygiene",
+        "This site is built using: {data}. Knowing this helps track whether that "
+        "specific software has any newly reported security issues going forward.",
+    ),
+    "Web Server": (
+        "general_hygiene",
+        "This site's web server software is: {data}.",
+    ),
 }
 
 
@@ -133,18 +250,21 @@ def run_passive_scan(target_host: str, timeout_seconds: int = 600) -> list[dict]
 
 def to_report_findings(events: list[dict]) -> list[dict]:
     """Maps raw SpiderFoot events onto the {"category", "detail"} shape
-    synthesize_report() expects. Drops events with no category mapping
-    (real data, just not one of the 4 report buckets yet) and de-duplicates
-    identical (category, detail) pairs, since several modules often confirm
-    the same fact independently.
+    synthesize_report() expects, using EXPLANATION_TEMPLATES so the model
+    always gets a real, specific, human-authored sentence - never a bare
+    "{type}: {data}" string (see this module's docstring for why that
+    matters). Drops events with no template (real data, just not
+    confidently explainable yet) and de-duplicates identical findings,
+    since several modules often confirm the same fact independently.
     """
     seen: set[tuple[str, str]] = set()
     findings: list[dict] = []
     for event in events:
-        category = EVENT_CATEGORY_MAP.get(event.get("type", ""))
-        if category is None:
+        template = EXPLANATION_TEMPLATES.get(event.get("type", ""))
+        if template is None:
             continue
-        detail = f"{event['type']}: {event.get('data', '')}".strip()
+        category, explanation = template
+        detail = explanation.format(data=event.get("data", "")).strip()
         if len(detail) > DETAIL_MAX_LENGTH:
             detail = detail[:DETAIL_MAX_LENGTH] + "…"
         key = (category, detail)
