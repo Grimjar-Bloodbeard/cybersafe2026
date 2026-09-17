@@ -28,14 +28,22 @@
   input[type="number"], input[type="text"], input[type="email"] {
     width: 100%;
     font-family: "Public Sans", sans-serif;
-    font-size: 0.95rem;
-    padding: 11px 14px;
+    /* 16px minimum - iOS Safari auto-zooms the whole page on focus for any
+       input below that, which felt broken on a real phone during testing. */
+    font-size: 1rem;
+    padding: 12px 14px;
     border: 1px solid var(--rule);
     border-radius: 4px;
     background: var(--mist);
     color: var(--ink);
   }
   input:focus-visible { outline: 2px solid var(--ccn-orange); outline-offset: 1px; }
+
+  @media (max-width: 480px) {
+    main { padding: 0 16px 60px; margin-top: 24px; }
+    .card { padding: 24px; }
+    .card h1 { font-size: 1.4rem; }
+  }
 
   #attendee-fields { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 
@@ -65,8 +73,8 @@
     <div id="form-view">
       <h1>Register for the community event</h1>
       <p class="event-details">
-        <b>When:</b> December 11, 2026<br>
-        <b>Where:</b> Wilkes Community College <i>(room TBD)</i><br>
+        <b>When:</b> December 4, 2026, 1:00 PM<br>
+        <b>Where:</b> Wilkes Community College, Room 1709<br>
         <b>Questions:</b> <i>contact email TBD</i>
       </p>
 
@@ -106,7 +114,7 @@
 
     <div class="success-state" id="success-view">
       <h1>You're registered</h1>
-      <p>We'll see you December 11 at Wilkes Community College. We don't send confirmation emails yet, so keep this page (or a screenshot of it) as your confirmation.</p>
+      <p>We'll see you December 4 at 1:00 PM at Wilkes Community College. We don't send confirmation emails yet, so keep this page (or a screenshot of it) as your confirmation.</p>
     </div>
   </div>
 </main>
