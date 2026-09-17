@@ -70,6 +70,7 @@ comment in the code - it's an actual `pytest` suite proving it (see `backend/REA
 
 ```
 python -m pip install -e .
+python -m playwright install chromium   # one-time browser download, needed for Tier 2
 cp .env.example .env   # fill in SCRAPER_CONTACT (a real project contact, not evasion) and NVD_API_KEY
 ```
 
