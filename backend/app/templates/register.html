@@ -39,6 +39,24 @@
   }
   input:focus-visible { outline: 2px solid var(--ccn-orange); outline-offset: 1px; }
 
+  .checkbox-field {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 14px 16px;
+    background: var(--mist);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+  }
+  .checkbox-field input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    accent-color: var(--ccn-orange);
+    flex-shrink: 0;
+  }
+  .checkbox-field label { font-weight: 400; font-size: 0.92rem; line-height: 1.5; }
+
   @media (max-width: 480px) {
     main { padding: 0 16px 60px; margin-top: 24px; }
     .card { padding: 24px; }
@@ -106,6 +124,13 @@
           <input type="email" id="email" required>
         </div>
 
+        <div class="field checkbox-field">
+          <input type="checkbox" id="wants-live-assessment">
+          <label for="wants-live-assessment">Also sign my business up for a free, live
+            cybersecurity check-in on our website during the presentation - a student
+            will walk through what they find with us, in plain English.</label>
+        </div>
+
         <p class="error-text" id="error-text"></p>
 
         <button class="run" type="submit">Register</button>
@@ -168,6 +193,7 @@ $("register-form").addEventListener("submit", async (e) => {
         organization: $("organization").value.trim(),
         hp_website: $("hp-website").value,
         email: $("email").value.trim(),
+        wants_live_assessment: $("wants-live-assessment").checked,
       }),
     });
     const data = await resp.json();

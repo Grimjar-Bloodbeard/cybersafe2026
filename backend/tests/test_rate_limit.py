@@ -95,3 +95,20 @@ def test_real_registration_without_honeypot_is_saved(client):
         saved = session.query(EventRegistration).one()
         assert saved.organization == "N/A"
         assert json.loads(saved.attendee_names) == ["Test Person"]
+        assert saved.wants_live_assessment is False
+
+
+def test_wants_live_assessment_true_is_saved(client):
+    # An omitted field defaulting to False is already covered by
+    # test_real_registration_without_honeypot_is_saved above - this proves
+    # the other direction, that an explicit opt-in actually gets recorded.
+    test_client, TestSession = client
+    resp = test_client.post(
+        "/api/register", json=_registration_payload(wants_live_assessment=True)
+    )
+    assert resp.status_code == 200
+
+    with TestSession() as session:
+        from backend.app.db.models import EventRegistration
+
+        assert session.query(EventRegistration).one().wants_live_assessment is True

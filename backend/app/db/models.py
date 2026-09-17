@@ -221,7 +221,7 @@ class DemoShowcaseRun(Base):
 
 
 class EventRegistration(Base):
-    """Community event RSVPs (the Dec 11, 2026 event) - a separate concern from
+    """Community event RSVPs (the Dec 4, 2026 event) - a separate concern from
     the assessment pipeline above, kept in its own table rather than entangled
     with businesses/engagements.
     """
@@ -234,3 +234,8 @@ class EventRegistration(Base):
     organization: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, nullable=False)
     submitted_at: Mapped[str] = mapped_column(String, nullable=False)
+    # Meeting action item, 2026-09-15: an opt-in for a live assessment of the
+    # business's own website during the presentation itself - separate from
+    # the future real scan-admin tool (PLAN.md Section 7); this is just intent
+    # captured at RSVP time, reviewed by a human before anything is scheduled.
+    wants_live_assessment: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

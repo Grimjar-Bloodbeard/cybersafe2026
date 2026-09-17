@@ -71,6 +71,7 @@ class RegistrationRequest(BaseModel):
     attendee_names: list[str] = Field(min_length=1)
     organization: str = Field(min_length=1, max_length=200)
     email: EmailStr
+    wants_live_assessment: bool = False
     hp_website: str = Field(default="", max_length=200)  # honeypot - real users never fill this
 
     @model_validator(mode="after")
@@ -105,6 +106,7 @@ def submit_registration(
             attendee_names=json.dumps(registration.attendee_names),
             organization=registration.organization,
             email=registration.email,
+            wants_live_assessment=registration.wants_live_assessment,
             submitted_at=datetime.now(timezone.utc).isoformat(),
         )
     )
