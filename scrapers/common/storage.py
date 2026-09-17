@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS businesses (
     state TEXT,
     postal_code TEXT,
     profile_url TEXT,
+    latitude REAL,
+    longitude REAL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -80,8 +82,9 @@ def upsert_business(conn: sqlite3.Connection, business: dict) -> tuple[int, bool
         """
         INSERT INTO businesses (
             legal_name, website_root_url, source, sourced_at, directory_category,
-            directory_member_id, phone, street_address, city, state, postal_code, profile_url
-        ) VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?)
+            directory_member_id, phone, street_address, city, state, postal_code, profile_url,
+            latitude, longitude
+        ) VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             business["legal_name"],
@@ -95,6 +98,8 @@ def upsert_business(conn: sqlite3.Connection, business: dict) -> tuple[int, bool
             business.get("state"),
             business.get("postal_code"),
             business.get("profile_url"),
+            business.get("latitude"),
+            business.get("longitude"),
         ),
     )
     business_id = cursor.lastrowid

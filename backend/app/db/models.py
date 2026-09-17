@@ -65,6 +65,14 @@ class Business(Base):
     postal_code: Mapped[str | None] = mapped_column(String)
     profile_url: Mapped[str | None] = mapped_column(String)
     created_at: Mapped[str] = mapped_column(String, nullable=False)
+    # Meeting action item, 2026-09-15: enforcing "no organization further than
+    # a 30-minute drive from the event" needs real coordinates, not just a
+    # city-name filter - see scripts/export_outreach_list.py's distance
+    # calculation. Nullable: Chamber-of-Commerce-sourced rows don't have these
+    # until geocoded (scrapers/common/geocode.py backfills them); OSM-sourced
+    # rows (community scraper) get them directly at scrape time, for free.
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
 
     engagements: Mapped[list["Engagement"]] = relationship(back_populates="business")
 
@@ -221,7 +229,7 @@ class DemoShowcaseRun(Base):
 
 
 class EventRegistration(Base):
-    """Community event RSVPs (the Dec 11, 2026 event) - a separate concern from
+    """Community event RSVPs (the Dec 4, 2026 event) - a separate concern from
     the assessment pipeline above, kept in its own table rather than entangled
     with businesses/engagements.
     """
@@ -234,3 +242,8 @@ class EventRegistration(Base):
     organization: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, nullable=False)
     submitted_at: Mapped[str] = mapped_column(String, nullable=False)
+    # Meeting action item, 2026-09-15: an opt-in for a live assessment of the
+    # business's own website during the presentation itself - separate from
+    # the future real scan-admin tool (PLAN.md Section 7); this is just intent
+    # captured at RSVP time, reviewed by a human before anything is scheduled.
+    wants_live_assessment: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

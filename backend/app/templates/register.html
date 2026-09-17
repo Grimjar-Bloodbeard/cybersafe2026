@@ -28,14 +28,40 @@
   input[type="number"], input[type="text"], input[type="email"] {
     width: 100%;
     font-family: "Public Sans", sans-serif;
-    font-size: 0.95rem;
-    padding: 11px 14px;
+    /* 16px minimum - iOS Safari auto-zooms the whole page on focus for any
+       input below that, which felt broken on a real phone during testing. */
+    font-size: 1rem;
+    padding: 12px 14px;
     border: 1px solid var(--rule);
     border-radius: 4px;
     background: var(--mist);
     color: var(--ink);
   }
   input:focus-visible { outline: 2px solid var(--ccn-orange); outline-offset: 1px; }
+
+  .checkbox-field {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 14px 16px;
+    background: var(--mist);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+  }
+  .checkbox-field input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    accent-color: var(--ccn-orange);
+    flex-shrink: 0;
+  }
+  .checkbox-field label { font-weight: 400; font-size: 0.92rem; line-height: 1.5; }
+
+  @media (max-width: 480px) {
+    main { padding: 0 16px 60px; margin-top: 24px; }
+    .card { padding: 24px; }
+    .card h1 { font-size: 1.4rem; }
+  }
 
   #attendee-fields { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 
@@ -65,12 +91,19 @@
     <div id="form-view">
       <h1>Register for the community event</h1>
       <p class="event-details">
-        <b>When:</b> December 11, 2026<br>
-        <b>Where:</b> Wilkes Community College <i>(room TBD)</i><br>
-        <b>Questions:</b> <i>contact email TBD</i>
+        <b>When:</b> December 4, 2026, 1:00 PM<br>
+        <b>Where:</b> Wilkes Community College, Room 1709<br>
+        <b>Questions:</b> <a href="mailto:cybersafe@students.wilkescc.edu">cybersafe@students.wilkescc.edu</a>
       </p>
 
       <form id="register-form">
+        <!-- Honeypot: invisible to a real visitor, but a bot's autofill often
+             fills every input it can find. A hidden field a real person never
+             sees or reaches by tabbing to it. Checked server-side in
+             backend/app/main.py - never trust a client-side-only honeypot. -->
+        <input type="text" name="hp_website" id="hp-website" tabindex="-1" autocomplete="off"
+               style="position:absolute; left:-9999px;" aria-hidden="true">
+
         <div class="field">
           <label for="group-size">How many people in your group?</label>
           <input type="number" id="group-size" min="1" max="10" value="1" required>
@@ -91,6 +124,13 @@
           <input type="email" id="email" required>
         </div>
 
+        <div class="field checkbox-field">
+          <input type="checkbox" id="wants-live-assessment">
+          <label for="wants-live-assessment">Also sign my business up for a free, live
+            cybersecurity check-in on our website during the presentation - a student
+            will walk through what they find with us, in plain English.</label>
+        </div>
+
         <p class="error-text" id="error-text"></p>
 
         <button class="run" type="submit">Register</button>
@@ -99,7 +139,7 @@
 
     <div class="success-state" id="success-view">
       <h1>You're registered</h1>
-      <p>We'll see you December 11 at Wilkes Community College. A confirmation has been recorded - no email will be sent yet, this is a working demo.</p>
+      <p>We'll see you December 4 at 1:00 PM at Wilkes Community College. We don't send confirmation emails yet, so keep this page (or a screenshot of it) as your confirmation.</p>
     </div>
   </div>
 </main>
@@ -117,6 +157,9 @@ function renderAttendeeFields(count) {
   for (let i = 0; i < count; i++) {
     const input = document.createElement("input");
     input.type = "text";
+    // A real, accessible label, not just a placeholder - placeholders vanish
+    // once someone types and aren't reliably announced by screen readers.
+    input.setAttribute("aria-label", `Attendee ${i + 1} name`);
     input.placeholder = `Attendee ${i + 1} name`;
     input.required = true;
     input.value = existingValues[i] || "";
@@ -148,7 +191,9 @@ $("register-form").addEventListener("submit", async (e) => {
         group_size: parseInt($("group-size").value, 10),
         attendee_names: attendeeNames,
         organization: $("organization").value.trim(),
+        hp_website: $("hp-website").value,
         email: $("email").value.trim(),
+        wants_live_assessment: $("wants-live-assessment").checked,
       }),
     });
     const data = await resp.json();
