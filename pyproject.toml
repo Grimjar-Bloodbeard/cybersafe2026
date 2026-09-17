@@ -19,6 +19,7 @@ dependencies = [
     "playwright>=1.47",
     "playwright-stealth>=1.0",
     "python-dotenv>=1.0",
+    "tenacity>=9.0",
 ]
 
 [project.optional-dependencies]

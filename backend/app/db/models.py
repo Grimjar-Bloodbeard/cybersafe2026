@@ -65,6 +65,14 @@ class Business(Base):
     postal_code: Mapped[str | None] = mapped_column(String)
     profile_url: Mapped[str | None] = mapped_column(String)
     created_at: Mapped[str] = mapped_column(String, nullable=False)
+    # Meeting action item, 2026-09-15: enforcing "no organization further than
+    # a 30-minute drive from the event" needs real coordinates, not just a
+    # city-name filter - see scripts/export_outreach_list.py's distance
+    # calculation. Nullable: Chamber-of-Commerce-sourced rows don't have these
+    # until geocoded (scrapers/common/geocode.py backfills them); OSM-sourced
+    # rows (community scraper) get them directly at scrape time, for free.
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
 
     engagements: Mapped[list["Engagement"]] = relationship(back_populates="business")
 
