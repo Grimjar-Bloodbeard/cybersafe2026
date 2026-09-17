@@ -21,7 +21,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from sqlalchemy.orm import Session
 
 from backend.app.db.models import EventRegistration
@@ -72,6 +72,18 @@ class RegistrationRequest(BaseModel):
     organization: str = Field(min_length=1, max_length=200)
     email: EmailStr
     hp_website: str = Field(default="", max_length=200)  # honeypot - real users never fill this
+
+    @model_validator(mode="after")
+    def _attendee_count_matches_group_size(self) -> "RegistrationRequest":
+        # Found by stress-testing the real event capacity/headcount data: nothing
+        # previously stopped a group_size of 50 landing with just one name, which
+        # would quietly wreck room/catering planning for the Dec 4 event.
+        if len(self.attendee_names) != self.group_size:
+            raise ValueError(
+                f"attendee_names must list exactly {self.group_size} "
+                f"name{'s' if self.group_size != 1 else ''} to match group_size"
+            )
+        return self
 
 
 @app.post("/api/register")
