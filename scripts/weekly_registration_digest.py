@@ -21,10 +21,8 @@ from __future__ import annotations
 
 import json
 import os
-import smtplib
 import sqlite3
 from datetime import datetime, timezone
-from email.mime.text import MIMEText
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -32,14 +30,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from backend.app.db.session import DB_PATH  # noqa: E402 - needs load_dotenv() first
+from backend.app.email_sender import send_email  # noqa: E402 - same reason
 
 STATE_PATH = Path(__file__).resolve().parent.parent / "data" / "digest_state.json"
 
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 465
-
-SENDER_EMAIL = os.environ.get("DIGEST_SENDER_EMAIL", "")
-SENDER_APP_PASSWORD = os.environ.get("DIGEST_SENDER_APP_PASSWORD", "")
 RECIPIENTS = [r.strip() for r in os.environ.get("DIGEST_RECIPIENTS", "").split(",") if r.strip()]
 
 
@@ -99,25 +93,6 @@ def build_email_body(new_rows: list[dict], total_attendees: int) -> str:
     return "\n".join(lines)
 
 
-def send_email(subject: str, body: str) -> bool:
-    if not (SENDER_EMAIL and SENDER_APP_PASSWORD and RECIPIENTS):
-        print(
-            "Digest not emailed: DIGEST_SENDER_EMAIL / DIGEST_SENDER_APP_PASSWORD / "
-            "DIGEST_RECIPIENTS aren't all set in .env yet. Printing the digest instead:\n"
-        )
-        return False
-
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = SENDER_EMAIL
-    msg["To"] = ", ".join(RECIPIENTS)
-
-    with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
-        server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
-        server.sendmail(SENDER_EMAIL, RECIPIENTS, msg.as_string())
-    return True
-
-
 def main() -> None:
     last_id = _load_last_reported_id()
     new_rows = fetch_new_registrations(last_id)
@@ -126,7 +101,7 @@ def main() -> None:
     body = build_email_body(new_rows, total_attendees)
     subject = f"CyberSafe 2026: {len(new_rows)} new registration(s) this week"
 
-    sent = send_email(subject, body)
+    sent = bool(RECIPIENTS) and send_email(RECIPIENTS, subject, body)
     print(body)
     print("\n(email sent)" if sent else "\n(email NOT sent - see message above)")
 

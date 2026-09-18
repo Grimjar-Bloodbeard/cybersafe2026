@@ -98,6 +98,20 @@ class Engagement(Base):
     rate_limit_override: Mapped[float | None] = mapped_column(Float)
     outreach_notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[str] = mapped_column(String, nullable=False)
+    # Team dashboard, 2026-09-18: Jovan's 3-step outreach sequence from the
+    # 2026-09-15 meeting, tracked per engagement so the whole team sees the
+    # same state instead of everyone keeping their own copy of a spreadsheet.
+    # Deliberately NOT extended to let the dashboard set status='authorized' -
+    # that stays a real signed-paperwork event, never a dashboard click (see
+    # backend/app/auth/gate.py's fail-closed design this would otherwise
+    # undercut). The dashboard can only move status between draft and
+    # pending_signature (not-yet-contacted vs. in-conversation); anything
+    # more nuanced ("declined", "call back next week") goes in outreach_notes
+    # rather than inventing new gate-relevant statuses.
+    outreach_step1_sent_at: Mapped[str | None] = mapped_column(String)
+    outreach_step2_sent_at: Mapped[str | None] = mapped_column(String)
+    outreach_step3_sent_at: Mapped[str | None] = mapped_column(String)
+    outreach_owner: Mapped[str | None] = mapped_column(String)  # which team member has this lead
 
     business: Mapped["Business"] = relationship(back_populates="engagements")
     scan_runs: Mapped[list["ScanRun"]] = relationship(back_populates="engagement")
@@ -247,3 +261,81 @@ class EventRegistration(Base):
     # the future real scan-admin tool (PLAN.md Section 7); this is just intent
     # captured at RSVP time, reviewed by a human before anything is scheduled.
     wants_live_assessment: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class TeamUser(Base):
+    """One of the 4 team members allowed to log into the team outreach
+    dashboard - entirely separate from Summit Gaming's own `users` table
+    (different project, different database, on purpose). Passkey-only, same
+    pattern as Summit's real, working webauthn.js/webauthn-routes.js -
+    reimplemented in Python here since this project is FastAPI, not Express,
+    not literally shared infrastructure. See backend/app/auth/passkeys.py.
+    """
+
+    __tablename__ = "team_users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    display_name: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="active")
+    # Holds the challenge between "start registration" and "finish
+    # registration" for one in-progress passkey enrollment - same shape as
+    # Summit's users.webauthn_challenge column.
+    webauthn_challenge: Mapped[str | None] = mapped_column(String)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    credentials: Mapped[list["TeamWebauthnCredential"]] = relationship(back_populates="user")
+
+
+class TeamWebauthnCredential(Base):
+    """One passkey (one device) belonging to one team member. A user can have
+    more than one (phone + laptop), same as Summit's webauthn_credentials.
+    """
+
+    __tablename__ = "team_webauthn_credentials"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("team_users.id"), nullable=False)
+    credential_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)  # base64url
+    public_key: Mapped[str] = mapped_column(String, nullable=False)  # base64
+    sign_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    transports: Mapped[str | None] = mapped_column(String)  # JSON-encoded list
+    device_label: Mapped[str | None] = mapped_column(String)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    last_used_at: Mapped[str | None] = mapped_column(String)
+
+    user: Mapped["TeamUser"] = relationship(back_populates="credentials")
+
+
+class TeamPasskeyEnrollToken(Base):
+    """A short-lived, single-use, emailed link that lets someone register
+    their very first passkey with no prior login to bootstrap from - same
+    mechanism as Summit's passkey_enroll_tokens (and its own
+    password_reset_tokens before that). Only the SHA-256 hash is stored,
+    never the raw token - same reasoning as backend/app/rate_limit.py trusting
+    only nginx-set headers: the raw token only ever exists in the email and
+    the requester's browser.
+    """
+
+    __tablename__ = "team_passkey_enroll_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("team_users.id"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String, nullable=False)
+    expires_at: Mapped[str] = mapped_column(String, nullable=False)
+    used_at: Mapped[str | None] = mapped_column(String)
+
+
+class TeamSession(Base):
+    """A logged-in team member's session. Only the SHA-256 hash of the
+    session token is stored (same reasoning as the enroll token above) - the
+    raw token lives only in the browser's cookie.
+    """
+
+    __tablename__ = "team_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_token_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("team_users.id"), nullable=False)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    expires_at: Mapped[str] = mapped_column(String, nullable=False)

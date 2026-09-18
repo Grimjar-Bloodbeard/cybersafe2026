@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CyberSafe 2026 - Outreach Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/shared.css">
+<style>
+  main { max-width: 1200px; margin: 32px auto 60px; padding: 0 24px; }
+
+  .top-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
+  }
+  .top-bar h1 { font-family: "Fraunces", Georgia, serif; font-size: 1.5rem; font-weight: 500; margin: 0; }
+  .top-bar .who { color: var(--ink-soft); font-size: 0.88rem; }
+  .top-bar button.run { width: auto; padding: 10px 18px; font-size: 0.85rem; }
+
+  .filters {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;
+  }
+  .filters select, .filters input {
+    font-family: "Public Sans", sans-serif; font-size: 0.88rem;
+    padding: 8px 12px; border: 1px solid var(--rule); border-radius: 4px;
+    background: var(--paper); color: var(--ink);
+  }
+  .filters input[type="search"] { flex: 1; min-width: 180px; }
+
+  .summary { color: var(--ink-soft); font-size: 0.85rem; margin-bottom: 14px; }
+
+  .table-wrap { overflow-x: auto; background: var(--paper); border-radius: 4px; box-shadow: 0 1px 2px rgba(27,39,51,0.08); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  th { background: var(--mist); font-weight: 600; position: sticky; top: 0; }
+  td.wrap { white-space: normal; min-width: 160px; }
+  tr:last-child td { border-bottom: none; }
+
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 600; }
+  .pill.in-range-yes { background: var(--sky-clear-soft); color: var(--sky-clear); }
+  .pill.in-range-no { background: var(--sky-storm-soft); color: var(--sky-storm); }
+  .pill.in-range-unknown { background: var(--sky-hazy-soft); color: #8a4f10; }
+
+  select.status-select { font-size: 0.82rem; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--rule); }
+
+  .step-btn {
+    font-size: 0.76rem; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--rule);
+    background: var(--mist); cursor: pointer; margin-right: 3px;
+  }
+  .step-btn.done { background: var(--sky-clear-soft); border-color: var(--sky-clear); color: var(--sky-clear); }
+
+  textarea.notes {
+    width: 100%; min-height: 32px; font-family: "Public Sans", sans-serif; font-size: 0.82rem;
+    padding: 5px 8px; border: 1px solid var(--rule); border-radius: 4px; resize: vertical;
+  }
+  input.owner { width: 90px; font-size: 0.82rem; padding: 4px 6px; border: 1px solid var(--rule); border-radius: 4px; }
+
+  .save-hint { font-size: 0.7rem; color: var(--ink-faint); }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <img src="/static/wcc-logo.png" alt="Wilkes Community College">
+    <div class="wordmark">Cyber<span>Safe</span><small>a Carolina Cyber Network project</small></div>
+    <img src="/static/ccn-logo.png" alt="Carolina Cyber Network">
+  </div>
+</header>
+
+<main>
+  <div class="top-bar">
+    <h1>Who to call</h1>
+    <div>
+      <span class="who">Signed in as {{ display_name }}</span>
+      <button class="run" id="logout-btn">Log out</button>
+    </div>
+  </div>
+
+  <div class="filters">
+    <select id="filter-range">
+      <option value="">All distances</option>
+      <option value="yes">Within range</option>
+      <option value="no">Too far</option>
+      <option value="unknown">Unknown - check address</option>
+    </select>
+    <select id="filter-status">
+      <option value="">Any status</option>
+      <option value="draft">Not yet contacted</option>
+      <option value="pending_signature">In conversation</option>
+      <option value="authorized">Authorized</option>
+    </select>
+    <input type="search" id="filter-search" placeholder="Search by name or city...">
+  </div>
+
+  <p class="summary" id="summary">Loading...</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>City</th>
+          <th>Phone</th>
+          <th>Distance</th>
+          <th>Status</th>
+          <th>Owner</th>
+          <th>Sequence</th>
+          <th class="wrap">Notes</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+function $(id) { return document.getElementById(id); }
+let allTargets = [];
+
+async function loadTargets() {
+  const resp = await fetch("/api/team/outreach");
+  if (resp.status === 401) { window.location.href = "/team/login"; return; }
+  const data = await resp.json();
+  allTargets = data.targets;
+  render();
+}
+
+function matchesFilters(t) {
+  const range = $("filter-range").value;
+  const status = $("filter-status").value;
+  const search = $("filter-search").value.trim().toLowerCase();
+  if (range && t.in_range !== range) return false;
+  if (status && t.status !== status) return false;
+  if (search && !(t.name.toLowerCase().includes(search) || (t.city || "").toLowerCase().includes(search))) return false;
+  return true;
+}
+
+function el(tag, props = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "text") node.textContent = v;
+    else node.setAttribute(k, v);
+  }
+  for (const child of children) node.appendChild(child);
+  return node;
+}
+
+async function patchTarget(businessId, payload) {
+  await fetch(`/api/team/outreach/${businessId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+function render() {
+  const filtered = allTargets.filter(matchesFilters);
+  $("summary").textContent = `${filtered.length} of ${allTargets.length} targets shown`;
+
+  const tbody = $("rows");
+  tbody.textContent = "";
+
+  for (const t of filtered) {
+    const tr = document.createElement("tr");
+
+    tr.appendChild(el("td", { text: t.name }));
+    tr.appendChild(el("td", { text: t.type || "" }));
+    tr.appendChild(el("td", { text: t.city || "" }));
+
+    const phoneTd = el("td");
+    if (t.phone) phoneTd.appendChild(el("a", { href: `tel:${t.phone}`, text: t.phone }));
+    tr.appendChild(phoneTd);
+
+    const distanceTd = el("td");
+    const label = t.miles_from_event == null ? "Unknown" : `${t.miles_from_event} mi`;
+    distanceTd.appendChild(el("span", { class: `pill in-range-${t.in_range}`, text: label }));
+    tr.appendChild(distanceTd);
+
+    const statusTd = el("td");
+    const statusSelect = el("select", { class: "status-select" });
+    const statusOptions = [["draft", "Not yet contacted"], ["pending_signature", "In conversation"]];
+    if (t.status === "authorized") statusOptions.push(["authorized", "Authorized"]);
+    for (const [val, label2] of statusOptions) {
+      const opt = el("option", { value: val, text: label2 });
+      if (val === t.status) opt.selected = true;
+      statusSelect.appendChild(opt);
+    }
+    if (t.status === "authorized") statusSelect.disabled = true;
+    statusSelect.addEventListener("change", () => patchTarget(t.business_id, { status: statusSelect.value }));
+    statusTd.appendChild(statusSelect);
+    tr.appendChild(statusTd);
+
+    const ownerTd = el("td");
+    const ownerInput = el("input", { class: "owner", value: t.outreach_owner || "", placeholder: "who?" });
+    ownerInput.addEventListener("change", () => patchTarget(t.business_id, { outreach_owner: ownerInput.value }));
+    ownerTd.appendChild(ownerInput);
+    tr.appendChild(ownerTd);
+
+    const stepsTd = el("td");
+    [["step1", t.step1_sent_at], ["step2", t.step2_sent_at], ["step3", t.step3_sent_at]].forEach(([step, sentAt], i) => {
+      const btn = el("button", { class: `step-btn${sentAt ? " done" : ""}`, text: `${i + 1}` });
+      btn.title = sentAt ? `Sent ${sentAt}` : `Mark step ${i + 1} sent`;
+      btn.addEventListener("click", async () => {
+        await patchTarget(t.business_id, { [`mark_${step}_sent`]: true });
+        loadTargets();
+      });
+      stepsTd.appendChild(btn);
+    });
+    tr.appendChild(stepsTd);
+
+    const notesTd = el("td", { class: "wrap" });
+    const notesArea = el("textarea", { class: "notes" });
+    notesArea.value = t.outreach_notes || "";
+    notesArea.addEventListener("change", () => patchTarget(t.business_id, { outreach_notes: notesArea.value }));
+    notesTd.appendChild(notesArea);
+    tr.appendChild(notesTd);
+
+    tbody.appendChild(tr);
+  }
+}
+
+$("filter-range").addEventListener("change", render);
+$("filter-status").addEventListener("change", render);
+$("filter-search").addEventListener("input", render);
+
+$("logout-btn").addEventListener("click", async () => {
+  await fetch("/api/team/logout", { method: "POST" });
+  window.location.href = "/team/login";
+});
+
+loadTargets();
+</script>
+
+</body>
+</html>
