@@ -17,10 +17,11 @@ of this script:
 
 Distance is straight-line ("as the crow flies"), not real driving time - no
 routing API is wired in, and this project doesn't have one. Documented
-honestly as an approximation rather than presented as exact: EVENT_RADIUS_MILES
-is picked generously for this specific rural/mountainous county so a winding
-road doesn't wrongly exclude somewhere genuinely reachable in ~30 minutes -
-see its own comment for the reasoning. This is why: pandas earns its place
+honestly as an approximation rather than presented as exact - see
+scrapers/common/distance.py's own comment for the reasoning. That module is
+the one place this project defines "how far is this from the event," shared
+with the team dashboard (backend/app/team.py) so the two can't quietly
+disagree about what counts as in range. This is why: pandas earns its place
 here doing exactly this kind of table math, without hand-writing CSV
 formatting.
 
@@ -29,36 +30,15 @@ real, not-yet-authorized contact info, and this repo is public.
 """
 from __future__ import annotations
 
-import math
 import sqlite3
 from pathlib import Path
 
 import pandas as pd
 
+from scrapers.common.distance import EVENT_LOCATION, EVENT_RADIUS_MILES, haversine_miles
+
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "cybersafe.db"
 OUTPUT_PATH = Path(__file__).resolve().parent.parent / "data" / "outreach_list.csv"
-
-# Wilkes Community College, 1328 S Collegiate Dr, Wilkesboro, NC - the actual
-# Dec 4 event location (see backend/app/templates/register.html).
-EVENT_LOCATION = (36.1355152, -81.1830366)
-
-# A straight-line proxy for "30-minute drive," not driving time itself - no
-# routing API is wired into this project. Picked generously for Wilkes
-# County's rural, winding secondary roads (a real drive covers less straight-
-# line distance per minute than a highway would), so this errs toward
-# including a genuinely-reachable place rather than wrongly excluding one.
-# The known Georgia address (~300 miles) is correctly excluded either way;
-# this matters for the closer, more ambiguous cases near the boundary.
-EVENT_RADIUS_MILES = 20.0
-
-EARTH_RADIUS_MILES = 3958.8
-
-
-def haversine_miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    lat1, lon1, lat2, lon2 = map(math.radians, (lat1, lon1, lat2, lon2))
-    d_lat, d_lon = lat2 - lat1, lon2 - lon1
-    a = math.sin(d_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(d_lon / 2) ** 2
-    return EARTH_RADIUS_MILES * 2 * math.asin(math.sqrt(a))
 
 
 def build_outreach_dataframe() -> pd.DataFrame:
