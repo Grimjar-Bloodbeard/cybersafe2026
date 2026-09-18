@@ -235,10 +235,26 @@ D:\cybersafe2026\
 | Shodan InternetDB | Passive open-ports/services/CVE snapshot per IP | No key needed; ethically clean — lookup against existing passive data, not an active scan we initiate |
 | In-house header grading | CSP/HSTS/X-Frame-Options/etc. scoring | securityheaders.com's public API was discontinued — build the rubric in-house from data the crawler already has |
 | SecurityTrails (stretch, Week 8-9) | Passive DNS/subdomain corroboration | Free tier 2,500 queries/mo |
+| SpiderFoot (added 2026-09-14) | Cross-check via 200+ OSINT modules — CVEs, exposed files, TLS issues, malicious-host flags | See `scrapers/enrichment/` |
 
 **Deliberately excluded**: Have I Been Pwned (paid now, and breach/credential data brushes
 the "no credential attacks" scope boundary — document as a conscious exclusion). CAPTCHA
 solvers/residential proxies against real targets.
+
+**Architecture decision (2026-09-14): SpiderFoot, self-hosted, run as a subprocess.**
+The team's mentors showed SpiderFoot (github.com/smicallef/spiderfoot, MIT licensed) in
+a meeting. Unlike the earlier Apify call, this isn't a hosted/configured SaaS platform —
+it's self-hosted, open-source Python run on our own machine, the same category as Scrapy
+or Playwright, which this project already treats as legitimate frameworks to build real
+orchestration around. `scrapers/enrichment/spiderfoot_scan.py` runs it exactly the way
+Scrapy is already planned to run (subprocess, own code owns the gate check + parsing),
+curates its `-u passive`-only module output down to this project's 4 report categories
+(`EVENT_CATEGORY_MAP`), and feeds it into the same Tier 5 Ollama synthesis every other
+source uses. Vendored at gitignored `vendor/spiderfoot/` (own dependencies, own venv,
+never committed) rather than a git submodule — one clone away from a beginner-hostile
+git workflow. One real gap found while mapping its event types: SpiderFoot checks SPF
+but has no dedicated DMARC/DKIM check, so that part of the phishing-exposure category
+still needs our own DNS enrichment client.
 
 ---
 
