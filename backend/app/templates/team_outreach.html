@@ -64,6 +64,7 @@
     display: inline-block; font-size: 0.72rem; font-weight: 600; padding: 2px 8px;
     border-radius: 999px; background: var(--mist); color: var(--ink-soft); white-space: nowrap;
   }
+  .badge.check-address { background: var(--sky-hazy-soft); color: #8a4f10; }
 
   .call-btn {
     display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -179,7 +180,11 @@ function buildCard(t) {
 
   const top = el("div", { class: "card-top" });
   top.appendChild(el("div", { class: "card-name", text: t.name }));
-  if (t.miles_from_event != null) top.appendChild(el("span", { class: "badge", text: `${t.miles_from_event} mi` }));
+  if (t.miles_from_event != null) {
+    top.appendChild(el("span", { class: "badge", text: `${t.miles_from_event} mi` }));
+  } else {
+    top.appendChild(el("span", { class: "badge check-address", text: "Check address" }));
+  }
   card.appendChild(top);
 
   const metaParts = [t.type, t.city].filter(Boolean).join(" · ");

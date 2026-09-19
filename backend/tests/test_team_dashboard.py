@@ -312,10 +312,11 @@ def test_logout_cookie_deletion_reaches_the_response(client):
 
 # ---- Cody's call, 2026-09-18: confirmed-too-far businesses are dropped ----
 
-def test_confirmed_too_far_and_unconfirmed_businesses_are_excluded(client):
-    # Cody's call, 2026-09-19: the list is only the closest confirmed-distance
-    # targets now, not "everyone in range plus everyone unconfirmed" -
-    # ranking by distance requires an actual distance to rank by.
+def test_confirmed_too_far_is_excluded_but_unconfirmed_still_shows(client):
+    # Cody's call, 2026-09-19 (reversed from an earlier call the same day):
+    # confirmed-too-far is a real exclusion (the meeting's 30-minute-drive
+    # rule), but unconfirmed-address businesses are real, uncategorized data
+    # and belong in the list too - just without a distance to rank by.
     test_client, TestSession = client
     with TestSession() as db:
         user = _make_user(db)
@@ -324,7 +325,7 @@ def test_confirmed_too_far_and_unconfirmed_businesses_are_excluded(client):
         _make_business_with_engagement(db, name="Way Too Far LLC", latitude=33.5157, longitude=-81.7368)
         # WCC's own coordinates - definitely in range.
         _make_business_with_engagement(db, name="Right Next Door LLC", latitude=36.1355152, longitude=-81.1830366)
-        # No coordinates at all - unconfirmed, no longer shown by default.
+        # No coordinates at all - unconfirmed, but still a real target.
         _make_business_with_engagement(db, name="Unknown Address LLC")
 
         from fastapi import Response
@@ -334,14 +335,20 @@ def test_confirmed_too_far_and_unconfirmed_businesses_are_excluded(client):
 
     test_client.cookies.set("cybersafe_team_session", raw_cookie)
     resp = test_client.get("/api/team/outreach")
-    names = {t["name"] for t in resp.json()["targets"]}
+    targets = resp.json()["targets"]
+    by_name = {t["name"]: t for t in targets}
 
-    assert "Way Too Far LLC" not in names
-    assert "Right Next Door LLC" in names
-    assert "Unknown Address LLC" not in names
+    assert "Way Too Far LLC" not in by_name
+    assert "Right Next Door LLC" in by_name
+    assert "Unknown Address LLC" in by_name
+    assert by_name["Unknown Address LLC"]["miles_from_event"] is None
+    # Confirmed-distance ones still come first - unconfirmed trails behind,
+    # never claiming a rank it can't support.
+    names_in_order = [t["name"] for t in targets]
+    assert names_in_order.index("Right Next Door LLC") < names_in_order.index("Unknown Address LLC")
 
 
-def test_targets_are_sorted_closest_first_and_capped(client):
+def test_targets_are_sorted_closest_first(client):
     test_client, TestSession = client
     with TestSession() as db:
         user = _make_user(db)
