@@ -20,6 +20,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from backend.app import team as team_module
 from backend.app.auth import passkeys
 from backend.app.auth.team_session import create_session
 from backend.app.db.models import Base, Business, Engagement, TeamPasskeyEnrollToken, TeamUser
@@ -44,6 +45,12 @@ def client():
             session.close()
 
     app.dependency_overrides[get_session] = override_get_session
+    # ENROLL_REQUEST_LIMIT/LOGIN_LIMIT are module-level singletons sharing
+    # state across every test in this file (same reasoning as the real
+    # rate limiter's own in-process design) - reset both so one test's
+    # requests never trip another's rate limit.
+    team_module.ENROLL_REQUEST_LIMIT._hits.clear()
+    team_module.LOGIN_LIMIT._hits.clear()
     # https base_url, not the default http://testserver: the session cookie
     # is marked Secure (correct for the real deployment, which is genuinely
     # HTTPS) - over a plain-http test client, httpx's own cookie jar quietly
@@ -138,6 +145,71 @@ def test_enroll_request_is_enumeration_safe(client):
     real_resp = test_client.post("/api/team/enroll/request", json={"email": "nobody@example.com"})
     assert real_resp.status_code == 200
     assert "sent" in real_resp.json()["message"].lower()
+
+
+# ---- self-service signup via a shared invite code, 2026-09-19 ----
+
+def test_correct_invite_code_creates_a_new_team_member(client, monkeypatch):
+    monkeypatch.setenv("TEAM_INVITE_CODE", "letmein")
+    test_client, TestSession = client
+    resp = test_client.post(
+        "/api/team/enroll/request",
+        json={"email": "newperson@example.com", "display_name": "New Person", "invite_code": "letmein"},
+    )
+    assert resp.status_code == 200
+
+    with TestSession() as db:
+        created = db.query(TeamUser).filter(TeamUser.email == "newperson@example.com").one()
+        assert created.display_name == "New Person"
+
+
+def test_wrong_invite_code_does_not_create_an_account(client, monkeypatch):
+    monkeypatch.setenv("TEAM_INVITE_CODE", "letmein")
+    test_client, TestSession = client
+    resp = test_client.post(
+        "/api/team/enroll/request",
+        json={"email": "shouldnotexist@example.com", "display_name": "Nope", "invite_code": "wrong-code"},
+    )
+    # Same enumeration-safe response as any other case - never reveals that
+    # the code itself was the reason nothing happened.
+    assert resp.status_code == 200
+
+    with TestSession() as db:
+        assert db.query(TeamUser).filter(TeamUser.email == "shouldnotexist@example.com").one_or_none() is None
+
+
+def test_no_invite_code_configured_disables_self_service(client):
+    # TEAM_INVITE_CODE unset entirely (the .env.example default) - self-
+    # service must be off, not silently accept any code.
+    test_client, TestSession = client
+    resp = test_client.post(
+        "/api/team/enroll/request",
+        json={"email": "shouldnotexist2@example.com", "display_name": "Nope", "invite_code": "anything"},
+    )
+    assert resp.status_code == 200
+
+    with TestSession() as db:
+        assert db.query(TeamUser).filter(TeamUser.email == "shouldnotexist2@example.com").one_or_none() is None
+
+
+def test_invite_code_cannot_rename_an_existing_member(client, monkeypatch):
+    # An existing account is found by email BEFORE the invite-code path ever
+    # runs, so someone submitting a real teammate's email with a different
+    # display_name (with or without the correct code) can't quietly rename
+    # them - the invite-code branch is only reachable when no account exists.
+    monkeypatch.setenv("TEAM_INVITE_CODE", "letmein")
+    test_client, TestSession = client
+    with TestSession() as db:
+        _make_user(db, email="existing@example.com", display_name="Real Name")
+
+    resp = test_client.post(
+        "/api/team/enroll/request",
+        json={"email": "existing@example.com", "display_name": "Impersonator", "invite_code": "letmein"},
+    )
+    assert resp.status_code == 200
+
+    with TestSession() as db:
+        assert db.query(TeamUser).filter(TeamUser.email == "existing@example.com").one().display_name == "Real Name"
 
 
 def test_expired_enroll_token_is_rejected(client):

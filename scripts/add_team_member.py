@@ -1,9 +1,13 @@
-"""Adds one team member who's allowed to log into the outreach dashboard.
+"""Adds one team member who's allowed to log into the outreach dashboard,
+bypassing the TEAM_INVITE_CODE self-service path in backend/app/team.py.
 
-No self-service account creation on purpose - only the 4 real team members
-should ever exist here, and there's no public "sign up" path to abuse.
-Run this once per person, then they enroll their own passkey at /team/enroll
-using the email you give them here.
+Self-service (2026-09-19, Cody's call - let each person pick whatever email
+they actually check, since a school address might not reliably receive mail
+from this sender) is now the normal way someone gets added: they visit
+/team/enroll themselves with the shared invite code. This script is for the
+exception - adding someone directly (e.g. bootstrapping the first account,
+which is how Cody was added, since nobody could invite him) or adding
+someone without needing to share the invite code with them at all.
 
 Usage: python -m scripts.add_team_member <email> "<display name>"
 """

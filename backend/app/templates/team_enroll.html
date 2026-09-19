@@ -40,8 +40,10 @@
 
     <div id="request-view">
       <h1>Set up team access</h1>
-      <p>Enter your team email and we'll send you a link to set up a passkey - no password to remember, ever.</p>
-      <input type="email" id="email" placeholder="you@students.wilkescc.edu" required>
+      <p>Enter your name, whatever email you'd like to use, and the invite code Cody gave you - we'll send a link to set up a passkey there. No password to remember, ever.</p>
+      <input type="text" id="display-name" placeholder="Your name" required>
+      <input type="email" id="email" placeholder="Any email you check regularly" required>
+      <input type="text" id="invite-code" placeholder="Invite code" required>
       <button class="run" id="request-btn">Send me a link</button>
       <p class="success-text" id="request-success">Check your email - the link expires in 15 minutes.</p>
       <p class="error-text" id="request-error"></p>
@@ -76,7 +78,11 @@ $("request-btn").addEventListener("click", async () => {
     const resp = await fetch("/api/team/enroll/request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: $("email").value.trim() }),
+      body: JSON.stringify({
+        email: $("email").value.trim(),
+        display_name: $("display-name").value.trim(),
+        invite_code: $("invite-code").value.trim(),
+      }),
     });
     const data = await resp.json();
     $("request-success").textContent = data.message;

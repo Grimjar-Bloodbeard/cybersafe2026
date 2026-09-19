@@ -11,6 +11,7 @@ a proven passkey pattern (Summit Gaming's webauthn.js) to build from.
 from __future__ import annotations
 
 import math
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -96,15 +97,33 @@ def show_team_outreach(user: TeamUser = Depends(_dep_get_current_team_user)):
 def enroll_request(payload: dict, request: Request, db: Session = Depends(get_session)):
     ENROLL_REQUEST_LIMIT.check(client_ip(request))
     # Enumeration-safe, same pattern as Summit's enroll/request: always the
-    # same response whether the email matches a real team account or not.
-    safe_response = {"message": "If that's a team account, an enrollment link has been sent."}
+    # same response regardless of what actually happened underneath -
+    # whether the email already existed, got newly created, or the invite
+    # code was wrong. Never confirms or denies any of that to the caller.
+    safe_response = {"message": "If that's valid, an enrollment link has been sent."}
     email = (payload.get("email") or "").strip().lower()
+    display_name = (payload.get("display_name") or "").strip()
+    invite_code = payload.get("invite_code") or ""
     if not email:
         return JSONResponse(safe_response)
 
     user = db.query(TeamUser).filter(TeamUser.email == email, TeamUser.status == "active").one_or_none()
     if user is None:
-        return JSONResponse(safe_response)
+        # Self-service, 2026-09-19: Cody's call - teammates pick their own
+        # email (a school address might not reliably receive mail from this
+        # sender) rather than being pre-added one at a time. Not fully open
+        # signup, though - this still holds real business contact data, so
+        # creating an account requires TEAM_INVITE_CODE, a shared secret
+        # only told to the actual 4 team members. A wrong or missing code
+        # gets the exact same response as a valid email that's already
+        # enrolled - never reveals which case actually happened.
+        expected_code = os.environ.get("TEAM_INVITE_CODE", "")
+        if not expected_code or not secrets.compare_digest(invite_code, expected_code) or not display_name:
+            return JSONResponse(safe_response)
+        user = TeamUser(email=email, display_name=display_name, created_at=datetime.now(timezone.utc).isoformat())
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
     raw_token = secrets.token_hex(32)
     db.query(TeamPasskeyEnrollToken).filter(
