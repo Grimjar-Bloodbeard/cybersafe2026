@@ -10,6 +10,7 @@ a proven passkey pattern (Summit Gaming's webauthn.js) to build from.
 """
 from __future__ import annotations
 
+import math
 import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -203,8 +204,17 @@ def logout(request: Request, db: Session = Depends(get_session)):
 _DASHBOARD_SETTABLE_STATUSES = {"draft", "pending_signature"}
 
 
-@router.get("/api/team/outreach")
-def list_outreach(user: TeamUser = Depends(_dep_get_current_team_user), db: Session = Depends(get_session)):
+# Cody's call, 2026-09-19: not "everyone in range," a focused list of the
+# closest ~400 - echoes the original meeting target (400 businesses), now
+# actually ranked by real distance instead of just a in-range/not split.
+TARGET_LIST_SIZE = 400
+
+
+def _ranked_engagements(db: Session) -> list[tuple[float, Business, Engagement]]:
+    """The closest TARGET_LIST_SIZE targets with a confirmed distance,
+    nearest first. Shared by the list endpoint and auto-assign, so the two
+    can never disagree about which ~400 businesses are actually "the list."
+    """
     rows = (
         db.query(Business, Engagement)
         .join(Engagement, Engagement.business_id == Business.id)
@@ -212,34 +222,67 @@ def list_outreach(user: TeamUser = Depends(_dep_get_current_team_user), db: Sess
         .all()
     )
 
-    targets = []
+    # Only a confirmed distance can be ranked "closest" - an unconfirmed
+    # address has no real place in a distance-sorted list, so it's left out
+    # of this view entirely rather than sorted arbitrarily. Still real data,
+    # still in the database (scripts/export_outreach_list.py's CSV still
+    # surfaces it) - just not part of "the 400 closest."
+    ranked = []
     for business, engagement in rows:
         miles = miles_from_event(business.latitude, business.longitude)
-        # Cody's call, 2026-09-18: confirmed-too-far isn't just deprioritized,
-        # it's not a real outreach target at all - drop it before it ever
-        # reaches the list, rather than filtering it client-side. "Unknown"
-        # (couldn't geocode) still shows - it hasn't been ruled out, someone
-        # still needs to eyeball the address.
-        if miles is not None and miles > EVENT_RADIUS_MILES:
+        if miles is None or miles > EVENT_RADIUS_MILES:
             continue
-        targets.append(
-            {
-                "business_id": business.id,
-                "name": business.legal_name,
-                "type": "business" if business.source != "osm_community_scrape" else business.directory_category,
-                "city": business.city,
-                "phone": business.phone,
-                "website": business.website_root_url,
-                "address_unconfirmed": miles is None,
-                "status": engagement.status,
-                "outreach_owner": engagement.outreach_owner,
-                "outreach_notes": engagement.outreach_notes,
-                "step1_sent_at": engagement.outreach_step1_sent_at,
-                "step2_sent_at": engagement.outreach_step2_sent_at,
-                "step3_sent_at": engagement.outreach_step3_sent_at,
-            }
-        )
+        ranked.append((miles, business, engagement))
+    ranked.sort(key=lambda r: r[0])
+    return ranked[:TARGET_LIST_SIZE]
+
+
+@router.get("/api/team/outreach")
+def list_outreach(user: TeamUser = Depends(_dep_get_current_team_user), db: Session = Depends(get_session)):
+    targets = [
+        {
+            "business_id": business.id,
+            "name": business.legal_name,
+            "type": "business" if business.source != "osm_community_scrape" else business.directory_category,
+            "city": business.city,
+            "phone": business.phone,
+            "website": business.website_root_url,
+            "miles_from_event": miles,
+            "status": engagement.status,
+            "outreach_owner": engagement.outreach_owner,
+            "outreach_notes": engagement.outreach_notes,
+            "step1_sent_at": engagement.outreach_step1_sent_at,
+            "step2_sent_at": engagement.outreach_step2_sent_at,
+            "step3_sent_at": engagement.outreach_step3_sent_at,
+        }
+        for miles, business, engagement in _ranked_engagements(db)
+    ]
     return JSONResponse({"targets": targets, "you": user.display_name})
+
+
+@router.post("/api/team/outreach/auto-assign")
+def auto_assign_outreach(
+    payload: dict,
+    user: TeamUser = Depends(_dep_get_current_team_user),
+    db: Session = Depends(get_session),
+):
+    """Splits the current ~400-target list into len(names) contiguous,
+    distance-sorted chunks - the closest chunk goes to names[0], and so on -
+    and sets outreach_owner for every one of them. A coordination label, not
+    a security-relevant field (unlike status), so overwriting existing
+    assignments in one clean pass is fine - anyone can still hand-edit a
+    single card afterward the normal way.
+    """
+    names = [n.strip() for n in payload.get("names", []) if n.strip()]
+    if len(names) < 2:
+        raise HTTPException(status_code=400, detail="Give at least 2 names to split the list between.")
+
+    ranked = _ranked_engagements(db)
+    chunk_size = math.ceil(len(ranked) / len(names))
+    for i, (_, _, engagement) in enumerate(ranked):
+        engagement.outreach_owner = names[i // chunk_size]
+    db.commit()
+    return JSONResponse({"success": True, "assigned": len(ranked), "per_person": chunk_size})
 
 
 @router.post("/api/team/outreach/{business_id}")

@@ -312,7 +312,10 @@ def test_logout_cookie_deletion_reaches_the_response(client):
 
 # ---- Cody's call, 2026-09-18: confirmed-too-far businesses are dropped ----
 
-def test_confirmed_too_far_business_is_excluded_from_the_list(client):
+def test_confirmed_too_far_and_unconfirmed_businesses_are_excluded(client):
+    # Cody's call, 2026-09-19: the list is only the closest confirmed-distance
+    # targets now, not "everyone in range plus everyone unconfirmed" -
+    # ranking by distance requires an actual distance to rank by.
     test_client, TestSession = client
     with TestSession() as db:
         user = _make_user(db)
@@ -321,7 +324,7 @@ def test_confirmed_too_far_business_is_excluded_from_the_list(client):
         _make_business_with_engagement(db, name="Way Too Far LLC", latitude=33.5157, longitude=-81.7368)
         # WCC's own coordinates - definitely in range.
         _make_business_with_engagement(db, name="Right Next Door LLC", latitude=36.1355152, longitude=-81.1830366)
-        # No coordinates at all - unconfirmed, not the same as "too far".
+        # No coordinates at all - unconfirmed, no longer shown by default.
         _make_business_with_engagement(db, name="Unknown Address LLC")
 
         from fastapi import Response
@@ -335,4 +338,70 @@ def test_confirmed_too_far_business_is_excluded_from_the_list(client):
 
     assert "Way Too Far LLC" not in names
     assert "Right Next Door LLC" in names
-    assert "Unknown Address LLC" in names
+    assert "Unknown Address LLC" not in names
+
+
+def test_targets_are_sorted_closest_first_and_capped(client):
+    test_client, TestSession = client
+    with TestSession() as db:
+        user = _make_user(db)
+        # All three genuinely within EVENT_RADIUS_MILES, at increasing real
+        # distances from WCC, added out of order on purpose.
+        _make_business_with_engagement(db, name="Farthest", latitude=36.30, longitude=-81.30)
+        _make_business_with_engagement(db, name="Closest", latitude=36.1360, longitude=-81.1835)
+        _make_business_with_engagement(db, name="Middle", latitude=36.20, longitude=-81.22)
+
+        from fastapi import Response
+        response = Response()
+        create_session(db, response, user)
+        raw_cookie = response.headers["set-cookie"].split(";")[0].split("=", 1)[1]
+
+    test_client.cookies.set("cybersafe_team_session", raw_cookie)
+    resp = test_client.get("/api/team/outreach")
+    ordered_names = [t["name"] for t in resp.json()["targets"]]
+
+    assert ordered_names == ["Closest", "Middle", "Farthest"]
+
+
+# ---- dividing the list among the team, 2026-09-19 ----
+
+def test_auto_assign_splits_into_contiguous_closest_first_chunks(client):
+    test_client, TestSession = client
+    with TestSession() as db:
+        user = _make_user(db)
+        # 4 targets, distinct real distances from WCC, added out of order.
+        _make_business_with_engagement(db, name="4th closest", latitude=36.30, longitude=-81.30)
+        _make_business_with_engagement(db, name="1st closest", latitude=36.1360, longitude=-81.1835)
+        _make_business_with_engagement(db, name="3rd closest", latitude=36.20, longitude=-81.22)
+        _make_business_with_engagement(db, name="2nd closest", latitude=36.16, longitude=-81.20)
+
+        from fastapi import Response
+        response = Response()
+        create_session(db, response, user)
+        raw_cookie = response.headers["set-cookie"].split(";")[0].split("=", 1)[1]
+
+    test_client.cookies.set("cybersafe_team_session", raw_cookie)
+    resp = test_client.post("/api/team/outreach/auto-assign", json={"names": ["Alice", "Bob"]})
+    assert resp.status_code == 200
+    assert resp.json() == {"success": True, "assigned": 4, "per_person": 2}
+
+    listed = {t["name"]: t["outreach_owner"] for t in test_client.get("/api/team/outreach").json()["targets"]}
+    assert listed["1st closest"] == "Alice"
+    assert listed["2nd closest"] == "Alice"
+    assert listed["3rd closest"] == "Bob"
+    assert listed["4th closest"] == "Bob"
+
+
+def test_auto_assign_requires_at_least_two_names(client):
+    test_client, TestSession = client
+    with TestSession() as db:
+        user = _make_user(db)
+        from fastapi import Response
+
+        response = Response()
+        create_session(db, response, user)
+        raw_cookie = response.headers["set-cookie"].split(";")[0].split("=", 1)[1]
+
+    test_client.cookies.set("cybersafe_team_session", raw_cookie)
+    resp = test_client.post("/api/team/outreach/auto-assign", json={"names": ["OnlyOne"]})
+    assert resp.status_code == 400
