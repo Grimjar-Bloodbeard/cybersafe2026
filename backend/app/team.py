@@ -215,12 +215,13 @@ def list_outreach(user: TeamUser = Depends(_dep_get_current_team_user), db: Sess
     targets = []
     for business, engagement in rows:
         miles = miles_from_event(business.latitude, business.longitude)
-        if miles is None:
-            in_range = "unknown"
-        elif miles <= EVENT_RADIUS_MILES:
-            in_range = "yes"
-        else:
-            in_range = "no"
+        # Cody's call, 2026-09-18: confirmed-too-far isn't just deprioritized,
+        # it's not a real outreach target at all - drop it before it ever
+        # reaches the list, rather than filtering it client-side. "Unknown"
+        # (couldn't geocode) still shows - it hasn't been ruled out, someone
+        # still needs to eyeball the address.
+        if miles is not None and miles > EVENT_RADIUS_MILES:
+            continue
         targets.append(
             {
                 "business_id": business.id,
@@ -229,8 +230,7 @@ def list_outreach(user: TeamUser = Depends(_dep_get_current_team_user), db: Sess
                 "city": business.city,
                 "phone": business.phone,
                 "website": business.website_root_url,
-                "miles_from_event": miles,
-                "in_range": in_range,
+                "address_unconfirmed": miles is None,
                 "status": engagement.status,
                 "outreach_owner": engagement.outreach_owner,
                 "outreach_notes": engagement.outreach_notes,

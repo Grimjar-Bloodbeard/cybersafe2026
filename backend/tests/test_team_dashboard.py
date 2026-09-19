@@ -61,13 +61,15 @@ def _make_user(db, email="zack@example.com", display_name="Zack"):
     return user
 
 
-def _make_business_with_engagement(db, name="Test Biz", status="draft"):
+def _make_business_with_engagement(db, name="Test Biz", status="draft", latitude=None, longitude=None):
     business = Business(
         legal_name=name,
         source="chamber_directory_scrape",
         sourced_at=datetime.now(timezone.utc).isoformat(),
         created_at=datetime.now(timezone.utc).isoformat(),
         phone="555-1234",
+        latitude=latitude,
+        longitude=longitude,
     )
     db.add(business)
     db.commit()
@@ -306,3 +308,31 @@ def test_logout_cookie_deletion_reaches_the_response(client):
 
     resp2 = test_client.get("/api/team/outreach")
     assert resp2.status_code == 401
+
+
+# ---- Cody's call, 2026-09-18: confirmed-too-far businesses are dropped ----
+
+def test_confirmed_too_far_business_is_excluded_from_the_list(client):
+    test_client, TestSession = client
+    with TestSession() as db:
+        user = _make_user(db)
+        # Aiken, SC - a real address seen in testing, ~184 miles from the
+        # event per scripts/export_outreach_list.py's own distance check.
+        _make_business_with_engagement(db, name="Way Too Far LLC", latitude=33.5157, longitude=-81.7368)
+        # WCC's own coordinates - definitely in range.
+        _make_business_with_engagement(db, name="Right Next Door LLC", latitude=36.1355152, longitude=-81.1830366)
+        # No coordinates at all - unconfirmed, not the same as "too far".
+        _make_business_with_engagement(db, name="Unknown Address LLC")
+
+        from fastapi import Response
+        response = Response()
+        create_session(db, response, user)
+        raw_cookie = response.headers["set-cookie"].split(";")[0].split("=", 1)[1]
+
+    test_client.cookies.set("cybersafe_team_session", raw_cookie)
+    resp = test_client.get("/api/team/outreach")
+    names = {t["name"] for t in resp.json()["targets"]}
+
+    assert "Way Too Far LLC" not in names
+    assert "Right Next Door LLC" in names
+    assert "Unknown Address LLC" in names
