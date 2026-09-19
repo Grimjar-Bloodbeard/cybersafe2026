@@ -14,7 +14,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlalchemy.orm import Session
@@ -169,20 +169,29 @@ def login_options(request: Request):
 
 
 @router.post("/api/team/login/verify")
-def login_verify(payload: dict, request: Request, response: Response, db: Session = Depends(get_session)):
+def login_verify(payload: dict, request: Request, db: Session = Depends(get_session)):
     LOGIN_LIMIT.check(client_ip(request))
     try:
         user = passkeys.finish_authentication(db, payload["response"])
     except passkeys.PasskeyError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
+    # Real bug found live, 2026-09-18: a Response injected via Depends only
+    # carries its headers/cookies through when the route returns nothing (or
+    # a plain dict) and lets FastAPI populate that same object - returning a
+    # separate JSONResponse instance here silently discarded the Set-Cookie
+    # header. Login itself succeeded every time; the session cookie just
+    # never reached the browser, so the very next request looked logged out.
+    # Fix: build the real response object first, set the cookie on IT.
+    response = JSONResponse({"success": True, "display_name": user.display_name})
     create_session(db, response, user)
-    return JSONResponse({"success": True, "display_name": user.display_name})
+    return response
 
 
 @router.post("/api/team/logout")
-def logout(request: Request, response: Response, db: Session = Depends(get_session)):
+def logout(request: Request, db: Session = Depends(get_session)):
+    response = JSONResponse({"success": True})
     destroy_session(db, request, response)
-    return JSONResponse({"success": True})
+    return response
 
 
 # ---- the outreach dashboard itself ----

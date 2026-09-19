@@ -11,6 +11,8 @@ never be able to authorize a real scan).
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,6 +20,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from backend.app.auth import passkeys
 from backend.app.auth.team_session import create_session
 from backend.app.db.models import Base, Business, Engagement, TeamPasskeyEnrollToken, TeamUser
 from backend.app.db.session import get_session
@@ -41,7 +44,12 @@ def client():
             session.close()
 
     app.dependency_overrides[get_session] = override_get_session
-    yield TestClient(app), TestSession
+    # https base_url, not the default http://testserver: the session cookie
+    # is marked Secure (correct for the real deployment, which is genuinely
+    # HTTPS) - over a plain-http test client, httpx's own cookie jar quietly
+    # refuses to resend a Secure cookie on the next request, which looks
+    # identical to the real bug this file exists to catch. Match production.
+    yield TestClient(app, base_url="https://testserver"), TestSession
     app.dependency_overrides.clear()
 
 
@@ -243,3 +251,58 @@ def test_marking_a_step_sent_records_a_timestamp(client):
         updated = db.query(Engagement).filter(Engagement.business_id == business_id).one()
         assert updated.outreach_step1_sent_at is not None
         assert updated.outreach_step2_sent_at is None
+
+
+# ---- real regression test: login must actually leave the browser logged in ----
+# Found live, 2026-09-18: /api/team/login/verify returned 200 every time, but
+# the session cookie never reached the browser, so the very next request
+# looked logged out. Root cause: the route set the cookie on the Response
+# injected via Depends, then returned a *different* JSONResponse instance -
+# silently discarding the Set-Cookie header. The unit-level tests above
+# never would have caught this, since they call create_session() directly
+# and construct their own Response - they bypass the route entirely. This
+# test goes through the real HTTP route, the only way to catch it.
+
+def test_login_verify_cookie_actually_works_for_the_next_request(client):
+    test_client, TestSession = client
+    with TestSession() as db:
+        user = _make_user(db)
+        user_id, display_name = user.id, user.display_name
+
+    # A plain stand-in, not a real ORM object: login_verify/create_session
+    # only ever touch .id and .display_name on what finish_authentication
+    # returns, and a detached SQLAlchemy row would just add unrelated
+    # session-lifecycle noise to a test that's about cookies, not the ORM.
+    fake_user = SimpleNamespace(id=user_id, display_name=display_name)
+
+    with patch.object(passkeys, "finish_authentication", return_value=fake_user):
+        resp = test_client.post("/api/team/login/verify", json={"response": {}})
+        assert resp.status_code == 200
+        assert "cybersafe_team_session" in resp.cookies
+
+    # The real regression: without the fix, this next request comes back 401
+    # even though login/verify just reported success.
+    resp2 = test_client.get("/api/team/outreach")
+    assert resp2.status_code == 200
+
+
+def test_logout_cookie_deletion_reaches_the_response(client):
+    test_client, TestSession = client
+    with TestSession() as db:
+        user = _make_user(db)
+        from fastapi import Response
+
+        response = Response()
+        create_session(db, response, user)
+        raw_cookie = response.headers["set-cookie"].split(";")[0].split("=", 1)[1]
+
+    test_client.cookies.set("cybersafe_team_session", raw_cookie)
+    resp = test_client.post("/api/team/logout")
+    assert resp.status_code == 200
+    # A real Set-Cookie header clearing the cookie must be on THIS response -
+    # same bug class as login: it's easy to set/delete a cookie on the wrong
+    # Response object and have it silently vanish.
+    assert "cybersafe_team_session" in resp.headers.get("set-cookie", "")
+
+    resp2 = test_client.get("/api/team/outreach")
+    assert resp2.status_code == 401
