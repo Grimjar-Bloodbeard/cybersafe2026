@@ -30,9 +30,16 @@ def main() -> None:
 
     db = SessionLocal()
     try:
-        existing = db.query(TeamUser).filter(TeamUser.email == email).one_or_none()
+        # Matches backend/app/team.py's identity model: (email, display_name)
+        # together, not email alone - the team shares one inbox, so the same
+        # email legitimately belongs to more than one real account.
+        existing = (
+            db.query(TeamUser)
+            .filter(TeamUser.email == email, TeamUser.display_name.ilike(display_name))
+            .one_or_none()
+        )
         if existing:
-            print(f"{email} is already a team member ({existing.display_name}) - nothing to do.")
+            print(f"{display_name} ({email}) is already a team member - nothing to do.")
             return
         db.add(
             TeamUser(

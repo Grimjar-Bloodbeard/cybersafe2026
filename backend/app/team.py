@@ -107,7 +107,22 @@ def enroll_request(payload: dict, request: Request, db: Session = Depends(get_se
     if not email:
         return JSONResponse(safe_response)
 
-    user = db.query(TeamUser).filter(TeamUser.email == email, TeamUser.status == "active").one_or_none()
+    # Identity here is (email, display_name) together, not email alone -
+    # found live, 2026-09-19: the team genuinely shares one inbox rather
+    # than each having a separately working address, so multiple real
+    # people can legitimately share an email. Matched case-insensitively on
+    # the name so "Zach"/"zach" don't silently fragment into two accounts.
+    user = (
+        db.query(TeamUser)
+        .filter(
+            TeamUser.email == email,
+            TeamUser.status == "active",
+            TeamUser.display_name.ilike(display_name or ""),
+        )
+        .one_or_none()
+        if display_name
+        else None
+    )
     if user is None:
         # Self-service, 2026-09-19: Cody's call - teammates pick their own
         # email (a school address might not reliably receive mail from this
@@ -115,8 +130,8 @@ def enroll_request(payload: dict, request: Request, db: Session = Depends(get_se
         # signup, though - this still holds real business contact data, so
         # creating an account requires TEAM_INVITE_CODE, a shared secret
         # only told to the actual 4 team members. A wrong or missing code
-        # gets the exact same response as a valid email that's already
-        # enrolled - never reveals which case actually happened.
+        # gets the exact same response as a valid (email, name) pair that's
+        # already enrolled - never reveals which case actually happened.
         expected_code = os.environ.get("TEAM_INVITE_CODE", "")
         if not expected_code or not secrets.compare_digest(invite_code, expected_code) or not display_name:
             return JSONResponse(safe_response)

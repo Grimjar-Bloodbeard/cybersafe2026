@@ -192,24 +192,52 @@ def test_no_invite_code_configured_disables_self_service(client):
         assert db.query(TeamUser).filter(TeamUser.email == "shouldnotexist2@example.com").one_or_none() is None
 
 
-def test_invite_code_cannot_rename_an_existing_member(client, monkeypatch):
-    # An existing account is found by email BEFORE the invite-code path ever
-    # runs, so someone submitting a real teammate's email with a different
-    # display_name (with or without the correct code) can't quietly rename
-    # them - the invite-code branch is only reachable when no account exists.
+def test_shared_email_different_name_creates_a_separate_account(client, monkeypatch):
+    # Identity is (email, display_name) together, not email alone - found
+    # live, 2026-09-19: the real team shares one inbox rather than each
+    # having a separately working address. A different name at the same
+    # email is legitimately a different person, not a rename/impersonation -
+    # both accounts must exist afterward, untouched from each other.
     monkeypatch.setenv("TEAM_INVITE_CODE", "letmein")
     test_client, TestSession = client
     with TestSession() as db:
-        _make_user(db, email="existing@example.com", display_name="Real Name")
+        _make_user(db, email="shared@example.com", display_name="Real Name")
 
     resp = test_client.post(
         "/api/team/enroll/request",
-        json={"email": "existing@example.com", "display_name": "Impersonator", "invite_code": "letmein"},
+        json={"email": "shared@example.com", "display_name": "Second Person", "invite_code": "letmein"},
     )
     assert resp.status_code == 200
 
     with TestSession() as db:
-        assert db.query(TeamUser).filter(TeamUser.email == "existing@example.com").one().display_name == "Real Name"
+        names = {
+            u.display_name
+            for u in db.query(TeamUser).filter(TeamUser.email == "shared@example.com").all()
+        }
+        assert names == {"Real Name", "Second Person"}
+
+
+def test_matching_name_reuses_the_existing_account_not_a_duplicate(client, monkeypatch):
+    # The other half of the same identity model: the SAME (email, name) pair
+    # (case-insensitively) must find the existing account, not create a
+    # second one - this is how adding a 2nd/3rd device to one person's
+    # account is supposed to work.
+    monkeypatch.setenv("TEAM_INVITE_CODE", "letmein")
+    test_client, TestSession = client
+    with TestSession() as db:
+        existing = _make_user(db, email="shared@example.com", display_name="Zach")
+        existing_id = existing.id
+
+    resp = test_client.post(
+        "/api/team/enroll/request",
+        json={"email": "shared@example.com", "display_name": "zach", "invite_code": "letmein"},
+    )
+    assert resp.status_code == 200
+
+    with TestSession() as db:
+        matching = db.query(TeamUser).filter(TeamUser.email == "shared@example.com").all()
+        assert len(matching) == 1
+        assert matching[0].id == existing_id
 
 
 def test_expired_enroll_token_is_rejected(client):

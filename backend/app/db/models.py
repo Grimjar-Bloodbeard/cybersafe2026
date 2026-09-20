@@ -270,12 +270,19 @@ class TeamUser(Base):
     pattern as Summit's real, working webauthn.js/webauthn-routes.js -
     reimplemented in Python here since this project is FastAPI, not Express,
     not literally shared infrastructure. See backend/app/auth/passkeys.py.
+
+    email is deliberately NOT unique, found live 2026-09-19: the team
+    genuinely shares one inbox rather than each having their own working
+    address, so identity here is really (email, display_name) together -
+    a passkey doesn't actually need a unique email to be a distinct,
+    per-device credential, only a unique account to attach to. See
+    backend/app/team.py's enroll_request for the lookup that depends on this.
     """
 
     __tablename__ = "team_users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    email: Mapped[str] = mapped_column(String, nullable=False)
     display_name: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="active")
     # Holds the challenge between "start registration" and "finish
