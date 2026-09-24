@@ -86,6 +86,35 @@ regional — includes at least one Georgia address seen in testing). City/state 
 record, so filtering to Wilkesboro/North Wilkesboro/Miller's Creek for actual outreach is a
 simple query, not a scraping concern.
 
+**Sourcing broadened, 2026-09-16, per the 2026-09-15 team meeting's action items.** The
+outreach target grew from "Chamber-listed businesses" to "businesses, churches, town
+establishments, and community stakeholders," and a hard rule was added: nothing further than a
+30-minute drive from the event. Neither was something the Chamber scraper could give us — it
+only ever lists paying Chamber members (no churches), and a city-name filter can't express a
+drive-time boundary (it already missed the known Georgia address above).
+
+Two real additions, not a rework of the Chamber scraper:
+
+- `scrapers/tier1_static/community_scraper.py` — sources churches/community centers/social
+  facilities across Wilkes County via OpenStreetMap's Overpass API (free, no key, same
+  self-hosted-friendly spirit as the rest of this project). 242 real entries added. Needed a
+  real retry/backoff addition for the first time in this project (`scrapers/common/retry.py`,
+  `tenacity`) after Overpass returned a genuine 504 under load — exactly the Tier 4 utility this
+  section already named but hadn't actually needed yet.
+- `scrapers/common/geocode.py` — backfills latitude/longitude (new `businesses` columns) for
+  the ~536 Chamber-sourced rows, which only ever had a street address. Uses OSM Nominatim (1
+  req/sec, per its own usage policy — respected the same way robots.txt is). Honest about
+  misses: 225 of 536 addresses found no match and are left `NULL`, not guessed.
+
+`scripts/export_outreach_list.py` now computes real straight-line distance from the event
+location (Wilkes Community College) instead of filtering by city name, flags anything beyond 20
+miles (a documented, generous proxy for "30-minute drive" on this county's rural roads, not a
+real routing calculation) as excluded, and — fail-closed, same principle as the authorization
+gate — flags anything that couldn't be geocoded as "needs manual check" rather than assuming
+either way. Also added blank tracking columns for Jovan's 3-step outreach sequence from the same
+meeting (initial intro → ~2wk follow-up → ~2wk final email), since "central tracking" now means
+outreach-cadence progress, not just a signed/not-signed flag.
+
 ---
 
 ## 3. Repository structure
@@ -257,6 +286,14 @@ still needs our own DNS enrichment client.
 `demo_showcase_runs`, zero live DB access. Content: tier-ladder explainer, methodology/ethics
 page, 2-3 anonymized example runs, sample report layout, contact form that only emails the
 team (never touches the pipeline).
+
+**Status, 2026-09-12**: the demo report + registration pages (not yet the real scan-triggering
+tool described below) are live at `cybersafe.codynoah.net` — see
+`docs/architecture/DEPLOYMENT.md` for the full runbook. That's safe to be public precisely
+because it can't trigger a real scan against a real business. **The Tailscale-gating
+requirement below still applies in full** the day the real admin/live-execution tool
+(Tiers 2-5 against authorized engagements) actually gets built — don't skip it then just
+because the demo page didn't need it.
 
 **Admin/live-execution** (`frontend_admin`) — talks only to `backend/`, runs at a Tailscale
 MagicDNS name, **tailnet-only by default** (`tailscale serve`), basic auth in front even

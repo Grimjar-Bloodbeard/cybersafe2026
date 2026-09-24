@@ -1,13 +1,32 @@
-"""Exports the reachable, in-target-town business list to a plain CSV that the
-Outreach & Engagement Lead can actually open in Excel/Google Sheets - the raw
-data/cybersafe.db file isn't usable by anyone who isn't comfortable with SQL.
+"""Exports the full outreach target list - Chamber businesses AND the
+churches/community centers from the OSM scraper - to a plain CSV the
+Outreach & Engagement Lead can actually open in Excel/Google Sheets.
 
-This is where pandas earns its place: it's not a scraping tool, it's the
-standard library for exactly this - pulling rows into a table, filtering,
-sorting, and writing out a clean file - without hand-writing CSV formatting.
+Meeting action item, 2026-09-15, two real changes from the original version
+of this script:
 
-Output intentionally never gets committed to git (see .gitignore) - it's real,
-not-yet-authorized business contact info, and this repo is public.
+1. Scope grew from "Chamber-listed businesses in 3 towns" (a city-name
+   filter) to "everything within a 30-minute drive of the event" (a real
+   distance filter) - a name-based filter would never have caught the
+   already-known case of a Chamber member with a Georgia address, and
+   wouldn't include churches at all, since they were never Chamber members
+   in the first place.
+2. "Central tracking" now needs outreach-sequence progress, not just a
+   signed/not-signed flag - added blank columns matching Jovan's 3-step
+   method from the same meeting (see docs/architecture/PLAN.md).
+
+Distance is straight-line ("as the crow flies"), not real driving time - no
+routing API is wired in, and this project doesn't have one. Documented
+honestly as an approximation rather than presented as exact - see
+scrapers/common/distance.py's own comment for the reasoning. That module is
+the one place this project defines "how far is this from the event," shared
+with the team dashboard (backend/app/team.py) so the two can't quietly
+disagree about what counts as in range. This is why: pandas earns its place
+here doing exactly this kind of table math, without hand-writing CSV
+formatting.
+
+Output intentionally never gets committed to git (see .gitignore) - it's
+real, not-yet-authorized contact info, and this repo is public.
 """
 from __future__ import annotations
 
@@ -16,51 +35,72 @@ from pathlib import Path
 
 import pandas as pd
 
+from scrapers.common.distance import EVENT_LOCATION, EVENT_RADIUS_MILES, haversine_miles
+
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "cybersafe.db"
 OUTPUT_PATH = Path(__file__).resolve().parent.parent / "data" / "outreach_list.csv"
-
-# Real spelling variants found in the scraped city field - see project memory,
-# corrected 2026-09-11 after the first count (397) undercounted these.
-TARGET_CITY_VARIANTS = [
-    "Wilkesboro", "WILKESBORO",
-    "North Wilkesboro", "N Wilkesboro", "N. Wilkesboro",
-    "Millers Creek",
-]
 
 
 def build_outreach_dataframe() -> pd.DataFrame:
     conn = sqlite3.connect(DB_PATH)
-    placeholders = ",".join("?" for _ in TARGET_CITY_VARIANTS)
-    query = f"""
+    query = """
         SELECT
-            legal_name AS "Business Name",
+            legal_name AS "Name",
+            CASE
+                WHEN source = 'osm_community_scrape' THEN directory_category
+                ELSE 'business'
+            END AS "Type",
             city AS "City",
             phone AS "Phone",
             website_root_url AS "Website",
-            directory_category AS "Category",
-            profile_url AS "Chamber Profile"
+            profile_url AS "Chamber Profile",
+            latitude AS "_lat",
+            longitude AS "_lon"
         FROM businesses
-        WHERE city IN ({placeholders})
-        AND (phone IS NOT NULL OR website_root_url IS NOT NULL)
-        ORDER BY city, legal_name
+        -- A business needs a phone or website to be a cold-outreach target.
+        -- A church/community center doesn't need either - Jovan's outreach
+        -- method explicitly includes in-person walk-ins, and a real
+        -- location (which every OSM-sourced row has) is enough for that.
+        WHERE phone IS NOT NULL OR website_root_url IS NOT NULL OR source = 'osm_community_scrape'
+        ORDER BY legal_name
     """
-    df = pd.read_sql_query(query, conn, params=TARGET_CITY_VARIANTS)
+    df = pd.read_sql_query(query, conn)
     conn.close()
 
-    # Blank columns for the Outreach Lead to actually use - this file is meant
-    # to be opened and worked from, not just read once.
-    df["Contact Attempted?"] = ""
-    df["Outcome / Notes"] = ""
-    df["Signed?"] = ""
+    has_coords = df["_lat"].notna() & df["_lon"].notna()
+    df["Miles from event"] = pd.NA
+    df.loc[has_coords, "Miles from event"] = df.loc[has_coords].apply(
+        lambda r: round(haversine_miles(*EVENT_LOCATION, r["_lat"], r["_lon"]), 1), axis=1
+    )
+
+    # Fail closed on distance, same principle as the authorization gate: an
+    # address we couldn't geocode is NOT assumed to be in range. It's kept in
+    # the list (real, potentially valid outreach data) but clearly flagged
+    # for a human to check manually - never silently included or excluded.
+    df["In 30-min range?"] = "UNKNOWN - check address manually"
+    df.loc[has_coords & (df["Miles from event"] <= EVENT_RADIUS_MILES), "In 30-min range?"] = "Yes"
+    df.loc[has_coords & (df["Miles from event"] > EVENT_RADIUS_MILES), "In 30-min range?"] = "No - too far"
+
+    df = df.drop(columns=["_lat", "_lon"])
+
+    # Blank columns for the Outreach Lead to actually use - matches Jovan's
+    # 3-step method from the 2026-09-15 meeting (initial intro -> ~2wk
+    # follow-up -> ~2wk final "breakup" email) plus the eventual outcome.
+    for col in ["Step 1 Sent", "Step 2 Sent", "Step 3 Sent", "Outcome / Notes", "Signed?"]:
+        df[col] = ""
 
     return df
 
 
 def main() -> None:
     df = build_outreach_dataframe()
+    in_range = df[df["In 30-min range?"] == "Yes"]
+    print(f"Wrote {len(df)} total targets to {OUTPUT_PATH}")
+    print(f"  {len(in_range)} confirmed within {EVENT_RADIUS_MILES:.0f} miles of the event")
+    print(f"  {(df['In 30-min range?'] == 'No - too far').sum()} confirmed too far - excluded from active outreach, kept for the record")
+    print(f"  {(df['In 30-min range?'].str.startswith('UNKNOWN')).sum()} need a manual address check (geocoding found no match)")
+    print(f"\nBy type:\n{df['Type'].value_counts().to_string()}")
     df.to_csv(OUTPUT_PATH, index=False)
-    print(f"Wrote {len(df)} reachable businesses to {OUTPUT_PATH}")
-    print(f"\nBy city:\n{df['City'].value_counts().to_string()}")
 
 
 if __name__ == "__main__":

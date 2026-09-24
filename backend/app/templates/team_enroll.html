@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CyberSafe 2026 - Set Up Team Access</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/shared.css">
+<style>
+  main { max-width: 420px; margin: 60px auto 0; padding: 0 24px 80px; }
+  .card { background: var(--paper); border-radius: 4px; box-shadow: 0 1px 2px rgba(27, 39, 51, 0.08); padding: 40px; text-align: center; }
+  .card h1 { font-family: "Fraunces", Georgia, serif; font-size: 1.5rem; font-weight: 500; margin: 0 0 8px; }
+  .card p { color: var(--ink-soft); font-size: 0.92rem; margin: 0 0 24px; }
+  input[type="email"], input[type="text"] {
+    width: 100%; font-family: "Public Sans", sans-serif; font-size: 1rem;
+    padding: 12px 14px; border: 1px solid var(--rule); border-radius: 4px;
+    background: var(--mist); color: var(--ink); margin-bottom: 16px;
+  }
+  button.run { width: 100%; }
+  .error-text { color: var(--sky-storm); font-size: 0.85rem; margin-top: 14px; display: none; }
+  .error-text.show { display: block; }
+  .success-text { color: var(--sky-clear); font-size: 0.92rem; margin-top: 14px; display: none; }
+  .success-text.show { display: block; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <img src="/static/wcc-logo.png" alt="Wilkes Community College">
+    <div class="wordmark">Cyber<span>Safe</span><small>a Carolina Cyber Network project</small></div>
+    <img src="/static/ccn-logo.png" alt="Carolina Cyber Network">
+  </div>
+</header>
+
+<main>
+  <div class="card">
+
+    <div id="request-view">
+      <h1>Set up team access</h1>
+      <p>Enter your name, whatever email you'd like to use, and the invite code Cody gave you - we'll send a link to set up a passkey there. No password to remember, ever.</p>
+      <input type="text" id="display-name" placeholder="Your name" required>
+      <input type="email" id="email" placeholder="Any email you check regularly" required>
+      <input type="text" id="invite-code" placeholder="Invite code" required>
+      <button class="run" id="request-btn">Send me a link</button>
+      <p class="success-text" id="request-success">Check your email - the link expires in 15 minutes.</p>
+      <p class="error-text" id="request-error"></p>
+    </div>
+
+    <div id="finish-view" hidden>
+      <h1>Hi <span id="finish-name"></span></h1>
+      <p>Create a passkey on this device to finish setting up your account.</p>
+      <input type="text" id="device-label" placeholder="What device is this? (e.g. \"My laptop\")">
+      <button class="run" id="create-passkey-btn">Create my passkey</button>
+      <p class="success-text" id="finish-success">All set - <a href="/team/login">sign in</a> whenever you're ready.</p>
+      <p class="error-text" id="finish-error"></p>
+    </div>
+
+    <div id="invalid-view" hidden>
+      <h1>Link expired</h1>
+      <p>This enrollment link is no longer valid - it may have already been used, or 15 minutes passed. Request a new one below.</p>
+    </div>
+
+  </div>
+</main>
+
+<script src="/static/simplewebauthn-browser.min.js"></script>
+<script>
+function $(id) { return document.getElementById(id); }
+
+$("request-btn").addEventListener("click", async () => {
+  const errorEl = $("request-error");
+  errorEl.classList.remove("show");
+  $("request-btn").disabled = true;
+  try {
+    const resp = await fetch("/api/team/enroll/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: $("email").value.trim(),
+        display_name: $("display-name").value.trim(),
+        invite_code: $("invite-code").value.trim(),
+      }),
+    });
+    const data = await resp.json();
+    $("request-success").textContent = data.message;
+    $("request-success").classList.add("show");
+  } catch (err) {
+    errorEl.textContent = "Something went wrong - try again.";
+    errorEl.classList.add("show");
+  } finally {
+    $("request-btn").disabled = false;
+  }
+});
+
+// If this page was opened from an emailed link (?token=...), skip straight
+// to the "create a passkey" step instead of showing the request form again.
+const token = new URLSearchParams(window.location.search).get("token");
+if (token) {
+  fetch(`/api/team/enroll/validate?token=${encodeURIComponent(token)}`)
+    .then((r) => r.json())
+    .then((data) => {
+      $("request-view").hidden = true;
+      if (data.valid) {
+        $("finish-view").hidden = false;
+        $("finish-name").textContent = data.display_name;
+      } else {
+        $("invalid-view").hidden = false;
+      }
+    });
+}
+
+$("create-passkey-btn")?.addEventListener("click", async () => {
+  const errorEl = $("finish-error");
+  errorEl.classList.remove("show");
+  $("create-passkey-btn").disabled = true;
+  try {
+    const optsResp = await fetch("/api/team/enroll/options", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    if (!optsResp.ok) throw new Error((await optsResp.json()).detail || "Could not start setup");
+    const options = await optsResp.json();
+
+    const regResponse = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: options });
+
+    const verifyResp = await fetch("/api/team/enroll/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, response: regResponse, device_label: $("device-label").value.trim() || null }),
+    });
+    if (!verifyResp.ok) throw new Error((await verifyResp.json()).detail || "Setup failed");
+
+    $("create-passkey-btn").hidden = true;
+    $("device-label").hidden = true;
+    $("finish-success").classList.add("show");
+  } catch (err) {
+    errorEl.textContent = err.message || "Something went wrong - try again.";
+    errorEl.classList.add("show");
+  } finally {
+    $("create-passkey-btn").disabled = false;
+  }
+});
+</script>
+
+</body>
+</html>

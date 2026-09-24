@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CyberSafe 2026 - Free Cybersecurity Check-In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/shared.css">
+<style>
+  @page { size: letter; margin: 0; }
+
+  body { background: var(--mist); }
+
+  main {
+    max-width: 8.5in;
+    margin: 32px auto 60px;
+    padding: 0 24px;
+  }
+
+  .sheet {
+    position: relative;
+    overflow: hidden;
+    background: var(--paper);
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(27, 39, 51, 0.08);
+    padding: 56px 64px;
+    border-top: 6px solid;
+    border-image: linear-gradient(90deg, var(--ridge-green), var(--ridge-blue), var(--ccn-orange)) 1;
+  }
+
+  .ridge-motif {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 46%;
+    max-width: 420px;
+    height: auto;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .content { position: relative; z-index: 1; }
+
+  .eyebrow {
+    font-weight: 700;
+    font-size: 0.78rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--sky-clear);
+  }
+
+  h1 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 2.5rem;
+    line-height: 1.12;
+    margin: 10px 0 4px;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+
+  .subhead {
+    font-size: 1.08rem;
+    color: var(--ink-soft);
+    margin: 0 0 28px;
+    max-width: 46ch;
+  }
+
+  .lede {
+    font-size: 1.02rem;
+    line-height: 1.7;
+    color: var(--ink);
+    max-width: 54ch;
+  }
+
+  .lede b { color: var(--navy); }
+
+  .reassure {
+    margin-top: 18px;
+    padding: 14px 18px;
+    background: var(--sky-clear-soft);
+    border-left: 3px solid var(--sky-clear);
+    border-radius: 3px;
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 40px;
+    margin-top: 36px;
+    align-items: start;
+  }
+
+  .details dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px 16px;
+    margin: 0;
+  }
+  .details dt {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    color: var(--navy);
+    white-space: nowrap;
+  }
+  .details dd { margin: 0; color: var(--ink); }
+  .details dd i { color: var(--ink-faint); }
+
+  .details .free-badge {
+    display: inline-block;
+    margin-top: 18px;
+    padding: 6px 14px;
+    background: var(--sky-hazy-soft);
+    color: #8a4f10;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+  }
+
+  .scan-box {
+    text-align: center;
+    padding: 24px;
+    background: var(--mist);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  .scan-box img { width: 100%; max-width: 190px; height: auto; display: block; margin: 0 auto; border-radius: 3px; }
+  .scan-box .cta {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--ink);
+    margin: 14px 0 4px;
+  }
+  .scan-box .url {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    word-break: break-all;
+  }
+
+  .sign-off {
+    margin-top: 36px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 1.15rem;
+    color: var(--navy);
+    font-style: italic;
+  }
+
+  .sign-off small {
+    display: block;
+    margin-top: 6px;
+    font-family: "Public Sans", sans-serif;
+    font-style: normal;
+    font-size: 0.82rem;
+    color: var(--ink-faint);
+  }
+
+  @media print {
+    body { background: var(--paper); }
+    main { margin: 0; padding: 0; max-width: none; }
+    .sheet { box-shadow: none; border-radius: 0; padding: 0.6in 0.7in; }
+    footer { display: none; }
+  }
+
+  @media (max-width: 640px) {
+    .sheet { padding: 36px 28px; }
+    h1 { font-size: 2rem; }
+    .split { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <img src="/static/wcc-logo.png" alt="Wilkes Community College">
+    <div class="wordmark">Cyber<span>Safe</span><small>a Carolina Cyber Network project</small></div>
+    <img src="/static/ccn-logo.png" alt="Carolina Cyber Network">
+  </div>
+</header>
+
+<main>
+  <div class="sheet">
+    <svg class="ridge-motif" viewBox="0 0 420 220" preserveAspectRatio="xMaxYMax meet" aria-hidden="true">
+      <path d="M0,220 L0,150 L45,168 L95,110 L150,145 L200,85 L250,130 L300,70 L350,120 L420,60 L420,220 Z" fill="var(--ridge-green)" opacity="0.07"/>
+      <path d="M0,220 L0,175 L60,190 L120,140 L175,165 L230,115 L285,150 L340,100 L420,140 L420,220 Z" fill="var(--ridge-blue)" opacity="0.09"/>
+      <path d="M0,220 L0,195 L80,205 L150,180 L210,195 L270,160 L330,185 L420,170 L420,220 Z" fill="var(--ccn-orange)" opacity="0.06"/>
+    </svg>
+
+    <div class="content">
+      <p class="eyebrow">You're invited</p>
+      <h1>Is your business cyber safe?</h1>
+      <p class="subhead">Come find out - free, friendly, and no strings attached.</p>
+
+      <p class="lede">
+        A few students from Wilkes Community College would love to take a look at your
+        website and hand you a plain-English report on what's working and what could use
+        a little attention. <b>No jargon, no sales pitch, no charge</b> - just neighbors
+        helping neighbors keep their business a little safer online.
+      </p>
+
+      <p class="reassure">
+        We only ever look at what's already public on your site - the same thing any
+        visitor or search engine already sees. Nothing private, nothing invasive, and
+        nothing happens without you saying yes first.
+      </p>
+
+      <div class="split">
+        <div class="details">
+          <dl>
+            <dt>When</dt><dd>December 4, 2026 &middot; 1:00 PM</dd>
+            <dt>Where</dt><dd>Wilkes Community College, Room 1709</dd>
+            <dt>Bring</dt><dd>Yourself, a coworker, and your website's address</dd>
+            <dt>Questions</dt><dd><a href="mailto:cybersafe@students.wilkescc.edu">cybersafe@students.wilkescc.edu</a></dd>
+          </dl>
+          <span class="free-badge">100% free</span>
+        </div>
+
+        <div class="scan-box">
+          <img src="/static/register-qr.png" alt="QR code to register for the CyberSafe 2026 event">
+          <p class="cta">Scan to save your seat</p>
+          <p class="url">cybersafe.codynoah.net/register</p>
+        </div>
+      </div>
+
+      <p class="sign-off">
+        We'd love to have you at the table - bring a coworker, bring your questions, come as you are.
+        <small>CyberSafe 2026 &middot; Wilkes Community College &middot; Carolina Cyber Network</small>
+      </p>
+    </div>
+  </div>
+</main>
+
+</body>
+</html>

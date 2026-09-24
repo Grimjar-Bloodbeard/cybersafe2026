@@ -12,7 +12,7 @@ progressively more capable (and more expensive) tool:
 | Tier | Question it answers | Tool |
 |---|---|---|
 | 1 (`tier1_static/`) | Can I just download the raw HTML? | `requests` + `BeautifulSoup4` |
-| 2 (`tier2_playwright/`, coming Week 3) | Does the page need JavaScript to render its real content? | `Playwright` (drives a real browser) |
+| 2 (`tier2_playwright/`, built ahead of schedule) | Does the page need JavaScript to render its real content? | `Playwright` (drives a real browser) |
 | 3 (`tier3_scrapy/`, `tier3_asyncio/`, coming Week 4) | I need many pages, fast - how do I not do this one at a time? | `Scrapy`, `asyncio`/`aiohttp` |
 | 4 (`common/`, wraps every tier) | How do I behave like a careful, identifiable visitor instead of a flood? | rate limiting, robots.txt compliance, realistic fingerprints |
 | 5 (`tier5_ai/`, started ahead of schedule) | The page's structure is too inconsistent for fixed selectors, or raw findings need translating into plain English - now what? | a local LLM (Ollama) reads it like a person would |
@@ -105,6 +105,49 @@ exactly what it is and how to reach us. A scraper that fakes a browser's User-Ag
 blend in is doing something different - and for Tier 4 (Week 4-6), we'll draw that line
 explicitly: realistic fingerprinting gets *demonstrated* against a sandbox we control,
 never used to disguise traffic against a real, permissioned engagement target.
+
+## `tier2_playwright/` - seeing what JavaScript adds
+
+`requests.get()` (Tier 1) only ever sees what the server sent, before any code on the
+page has run. That's fine for a page that's already complete HTML - useless for one that
+starts as an empty shell and fills itself in afterward. Our own `/register` page is a
+real example: the server sends `<div id="attendee-fields"></div>` completely empty, and
+a few lines of JavaScript at the bottom of the page fill it with a real `<input>` field
+the instant the page loads. A plain download would never see that input exists.
+
+`dynamic_fetch.py` opens the page in an actual (headless, meaning no visible window)
+Chromium browser via [Playwright](https://playwright.dev), so it sees the page exactly
+the way a real visitor's browser would - JavaScript and all. Chosen over Selenium (the
+assignment's other named option) for modern auto-wait behavior: instead of writing a
+manual "sleep 2 seconds and hope it's ready" loop, you tell Playwright what selector to
+wait for and it polls efficiently until that shows up or a timeout is hit.
+
+Two optional knobs, for pages that need more than just "wait for the page to load":
+- `click_selector` - click something first (a "run" or "show more" button) before
+  capturing the page, for content that only appears after a real interaction.
+- `wait_selector` - wait for a specific element before capturing, more reliable than
+  guessing how long something will take.
+
+`playwright-stealth` quietly patches the small tells (a `navigator.webdriver` flag,
+missing browser plugins) that mark an automated Chromium as a bot instead of a person -
+same "good citizenship, not evasion" line Tier 1's User-Agent draws: this is about not
+getting misidentified as something hostile while doing permitted, polite scraping, not
+about disguising traffic against a real target.
+
+Try it against our own site (proven against a site we control first, before this is ever
+pointed at a real business - same rule as every tier):
+
+```
+python -m scrapers.tier2_playwright.dynamic_fetch https://cybersafe.codynoah.net/register --wait-for "#attendee-fields input"
+```
+
+That prints a real side-by-side: Tier 1's plain download sees ~7,000 characters (the
+empty shell), Tier 2's rendered browser sees ~7,500 (the shell plus the JavaScript-added
+input) - a concrete, repeatable number showing exactly what the heavier tool buys us.
+
+One-time setup beyond `pip install -e .`: Playwright needs an actual browser binary
+downloaded once - run `python -m playwright install chromium` after installing
+dependencies.
 
 ## `tier5_ai/` - translating findings into plain English
 

@@ -9,7 +9,9 @@ vendor/
 *.db-journal
 data/*.csv
 data/*.xlsx
+data/digest_state.json
 .pytest_cache/
+logs/*.log
 node_modules/
 dist/
 build/
